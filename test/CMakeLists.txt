@@ -46,3 +46,5 @@ add_test_case_with_run(vole vole_f2k_triple)
 add_test_case_with_run(ram ram_test)
 add_test_case_with_run(ram ram_ext_test)
 add_test_case_with_run(ram ro_ram_test)
+
+add_test_case_with_run(oprf try)
