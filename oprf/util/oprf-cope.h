@@ -188,26 +188,34 @@ public:
   }
 
   // debug function
-  // void check_triple(uint64_t *a, __uint128_t *b, int sz) {
-  //   if (party == ALICE) {
-  //     io->send_data(a, sizeof(uint64_t));
-  //     io->send_data(b, sz * sizeof(__uint128_t));
-  //   } else {
-  //     uint64_t delta;
-  //     __uint128_t *c = new __uint128_t[sz];
-  //     io->recv_data(&delta, sizeof(uint64_t));
-  //     io->recv_data(c, sz * sizeof(__uint128_t));
-  //     for (int i = 0; i < sz; ++i) {
-  //       __uint128_t tmp = mod((__uint128_t)a[i] * delta, pr);
-  //       tmp = mod(tmp + c[i], pr);
-  //       if (tmp != b[i]) {
-  //         std::cout << "wrong triple" << i << std::endl;
-  //         abort();
-  //       }
-  //     }
-  //   }
-  //   std::cout << "pass check" << std::endl;
-  // }
+  void check_triple(std::vector<mpz_class> &a, std::vector<mpz_class> &b, int sz) {
+    uint8_t *hex_de = new uint8_t[oprf_P_len / 8];
+    if (party == ALICE) {
+      hex_decompose(delta, hex_de);
+      io->send_data(hex_de, oprf_P_len / 8);
+      io->flush();
+    } else {
+      io->recv_data(hex_de, oprf_P_len / 8);
+      delta = hex_compose(hex_de);
+    }
+    for (int i = 0; i < sz; i++) {
+      if (party == ALICE) {
+        hex_decompose(b[i], hex_de);
+        io->send_data(hex_de, oprf_P_len / 8);
+        io->flush();
+      } else {
+        io->recv_data(hex_de, oprf_P_len / 8);
+        mpz_class c = hex_compose(hex_de);
+        mpz_class d = (delta * a[i] + c) % gmp_P;
+        if (d != b[i]) {
+          cout << "wrong triple!" << std::endl;
+          abort();
+        }
+      }
+    }
+    std::cout << "pass check" << std::endl;
+    delete[] hex_de;
+  }
 };
 
 #endif

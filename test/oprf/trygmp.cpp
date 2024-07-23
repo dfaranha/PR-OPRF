@@ -35,27 +35,36 @@ int main(int argc, char **argv) {
     cope.initialize(delta);
     com1 = comm(ios);
 	  com11 = comm2(ios);    
-    std::vector<mpz_class> v(5);
-    cope.extend(v, 5);
-    cout << delta << endl;
-    for (int i = 0; i < 5; i++) cout << i << ": " << v[i] << endl;
+    std::vector<mpz_class> v(50000);
+    auto start = clock_start();
+    cope.extend(v, 50000);
+    double ttt = time_from(start);
+    std::cout << "batch triple generation: " << ttt << " us" << std::endl; 
+    uint64_t com2 = comm(ios) - com1;
+    uint64_t com22 = comm2(ios) - com11;
+    std::cout << "communication (B): " << com2 << std::endl;
+    std::cout << "communication (B): " << com22 << std::endl;
+    cope.check_triple(v, v, 50000);
   } else {
     OprfCope<BoolIO<NetIO>> cope(party, ios[0], oprf_P_len);
     cope.initialize();
     com1 = comm(ios);
 	  com11 = comm2(ios);    
     GMP_PRG_FP prg;
-    std::vector<mpz_class> u(5);
-    std::vector<mpz_class> w(5);
-    for (int i = 0; i < 5; i++) u[i] = prg.sample();
-    cope.extend(w, u, 5);
-    for (int i = 0; i < 5; i++) cout << i << ": " << u[i] << ' ' << w[i] << endl;
+    std::vector<mpz_class> u(50000);
+    std::vector<mpz_class> w(50000);
+    for (int i = 0; i < 50000; i++) u[i] = prg.sample();
+    auto start = clock_start();
+    cope.extend(w, u, 50000);
+    double ttt = time_from(start);
+    std::cout << "batch triple generation: " << ttt << " us" << std::endl;    
+    uint64_t com2 = comm(ios) - com1;
+    uint64_t com22 = comm2(ios) - com11;
+    std::cout << "communication (B): " << com2 << std::endl;
+    std::cout << "communication (B): " << com22 << std::endl;
+    cope.check_triple(u, w, 50000);
   }
 
-	uint64_t com2 = comm(ios) - com1;
-	uint64_t com22 = comm2(ios) - com11;
-	std::cout << "communication (B): " << com2 << std::endl;
-	std::cout << "communication (B): " << com22 << std::endl;
 
   for (int i = 0; i < threads; ++i) {
     delete ios[i]->io;
