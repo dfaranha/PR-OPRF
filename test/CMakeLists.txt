@@ -1,7 +1,7 @@
 #Testing macro
 macro (add_test_executable_with_lib folder _name)
 	add_executable(test_${folder}_${_name} "${folder}/${_name}.cpp")
-	target_link_libraries(test_${folder}_${_name} ${EMP-OT_LIBRARIES} emp-zk)
+	target_link_libraries(test_${folder}_${_name} ${EMP-OT_LIBRARIES} ${GMP_LIBRARIES} ${GMPXX_LIBRARIES} emp-zk)
 endmacro()
 
 macro (add_test_case folder _name)
@@ -12,7 +12,6 @@ endmacro()
 macro (add_test_case_with_run folder _name)
 	add_test_executable_with_lib(${folder} ${_name})
 	add_test(NAME ${folder}_${_name} COMMAND "./run" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test_${folder}_${_name}" WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/")
-
 endmacro()
 
 # Test cases
@@ -48,3 +47,4 @@ add_test_case_with_run(ram ram_ext_test)
 add_test_case_with_run(ram ro_ram_test)
 
 add_test_case_with_run(oprf try)
+add_test_case_with_run(oprf trygmp)

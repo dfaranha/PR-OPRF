@@ -6,7 +6,12 @@ find_path(CMAKE_FOLDER NAMES cmake/emp-tool-config.cmake)
 include(${CMAKE_FOLDER}/cmake/emp-base.cmake)
 
 find_package(emp-ot REQUIRED)
-include_directories(${EMP-OT_INCLUDE_DIRS})
+find_package(GMP REQUIRED)
+include_directories(
+  ${EMP-OT_INCLUDE_DIRS}
+  ${GMP_INCLUDE_DIR}
+  ${GMPXX_INCLUDE_DIR}
+)
 set(sources
   emp-zk/emp-zk-bool/emp-zk-bool.cpp
   emp-zk/emp-zk-arith/emp-zk-arith.cpp
