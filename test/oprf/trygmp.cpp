@@ -35,17 +35,21 @@ int main(int argc, char **argv) {
     cope.initialize(delta);
     com1 = comm(ios);
 	  com11 = comm2(ios);    
-    mpz_class v = cope.extend();
-    cout << delta << ' ' << v << endl;
+    std::vector<mpz_class> v(5);
+    cope.extend(v, 5);
+    cout << delta << endl;
+    for (int i = 0; i < 5; i++) cout << i << ": " << v[i] << endl;
   } else {
     OprfCope<BoolIO<NetIO>> cope(party, ios[0], oprf_P_len);
     cope.initialize();
     com1 = comm(ios);
 	  com11 = comm2(ios);    
     GMP_PRG_FP prg;
-    mpz_class u = prg.sample();
-    mpz_class w = cope.extend(u);
-    cout << u << ' ' << w << endl;
+    std::vector<mpz_class> u(5);
+    std::vector<mpz_class> w(5);
+    for (int i = 0; i < 5; i++) u[i] = prg.sample();
+    cope.extend(w, u, 5);
+    for (int i = 0; i < 5; i++) cout << i << ": " << u[i] << ' ' << w[i] << endl;
   }
 
 	uint64_t com2 = comm(ios) - com1;
