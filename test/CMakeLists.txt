@@ -48,3 +48,5 @@ add_test_case_with_run(ram ro_ram_test)
 
 add_test_case_with_run(oprf try)
 add_test_case_with_run(oprf trygmp)
+add_test_case_with_run(oprf test_cope)
+add_test_case_with_run(oprf test_basevole)

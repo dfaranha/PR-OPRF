@@ -5,5 +5,6 @@
 #include "oprf/util/gmp-fp.h"
 #include "oprf/util/gmp-prg-fp.h"
 #include "oprf/util/oprf-cope.h"
+#include "oprf/util/oprf-basevole.h"
 
 #endif
