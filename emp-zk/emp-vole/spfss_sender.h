@@ -76,35 +76,6 @@ public:
   }
 
   // consistency check: Protocol PI_spsVOLE
-  void consistency_check(IO *io2, __uint128_t y) {
-    __uint128_t *chi = new __uint128_t[leave_n];
-    Hash hash;
-    __uint128_t digest = mod(_mm_extract_epi64(
-        hash.hash_for_block(&secret_sum, sizeof(uint64_t)), 0));
-    uni_hash_coeff_gen(chi, digest, leave_n);
-
-    // receive the x_star
-    // Y = y_star = y + x_star * delta
-    __uint128_t y_star, x_star;
-    io2->recv_data(&x_star, sizeof(__uint128_t));
-    __uint128_t tmp = mod(x_star * delta, pr);
-    tmp = pr - tmp;
-    y_star = mod(y + tmp, pr);
-
-    // V = \sum{chi_i*v_i} - Y
-    __uint128_t V =
-        vector_inn_prdt_sum_red(chi, (__uint128_t *)ggm_tree, leave_n);
-
-    y_star = pr - y_star;
-    V = mod(V + y_star, pr);
-
-    io2->send_data(&V, sizeof(__uint128_t));
-    io2->flush();
-
-    delete[] chi;
-  }
-
-  // consistency check: Protocol PI_spsVOLE
   void consistency_check_msg_gen(__uint128_t &V, IO *io2, block seed) {
     __uint128_t *chi = new __uint128_t[leave_n];
     Hash hash;
