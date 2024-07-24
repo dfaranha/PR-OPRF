@@ -15,24 +15,24 @@ public:
   mpz_class delta;
   std::vector<GMP_PRG_FP> G0;
   std::vector<GMP_PRG_FP> G1;
-  std::vector<char> delta_bool;
+  std::unique_ptr<bool[]> delta_bool;
 
-  OprfCope(int party, IO *io, size_t m) {
+
+  OprfCope(int party, IO *io, size_t m) : delta_bool(new bool[m]){
     this->party = party;
     this->m = m;
     this->io = io;
   }
 
-  // sender
-  void initialize(mpz_class delta) {
+  // sendern
+  void initialize(const mpz_class &delta) {
     this->delta = delta;
-    delta_bool.resize(m);
     delta384_to_bool();
 
     std::vector<block> K(m);
     OTCO<IO> otco(io);
 
-    otco.recv(&K[0], reinterpret_cast<bool*>(delta_bool.data()), m);
+    otco.recv(&K[0], delta_bool.get(), m);
     G0.resize(m);
     for (int i = 0; i < m; ++i)
       G0[i].reseed(&K[i]);
@@ -145,7 +145,7 @@ public:
   }
 
   inline void delta384_to_bool() {
-    bit_decompose(delta, delta_bool);
+    bit_decompose(delta, delta_bool.get());
   }
 
   mpz_class prm2pr(std::vector<mpz_class> &a) {
