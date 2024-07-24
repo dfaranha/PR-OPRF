@@ -8,7 +8,7 @@
 static mpz_class gmp_P("39402006196394479212279040100143613805079739270465446667948293404245721760140286615427945036794788117771363932962817");
 #define oprf_P_len 384
 
-void bit_decompose(mpz_class num, bool *out) {
+void bit_decompose(mpz_class num, std::vector<char> &out) {
     for (size_t i = 0; i < oprf_P_len; i++) {
         out[i] = ((num & 1) == 1);
         num >>= 1;
