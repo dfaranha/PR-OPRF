@@ -152,10 +152,10 @@ public:
     mpz_class ret = 0;
     mpz_class tmp;
     for (size_t i = 0; i < m; ++i) {
-      tmp = (a[i] << i) % gmp_P;
-      ret = (ret + tmp) % gmp_P;
+      tmp = (a[i] << i);
+      ret = (ret + tmp);
     }
-    return ret;
+    return ret % gmp_P;
   }
 
   void prm2pr(std::vector<mpz_class> &ret, std::vector<mpz_class> &w, const int &size) {
@@ -164,10 +164,11 @@ public:
     mpz_class tmp;
     for (int i = 0; i < m; i++) {
       for (int j = 0; j < size; j++) {
-        tmp = (w[i * size + j] << i) % gmp_P;
-        ret[j] = (ret[j] + tmp) % gmp_P;
+        tmp = (w[i * size + j] << i); // % gmp_P;
+        ret[j] = (ret[j] + tmp); // % gmp_P;
       }
     }
+    for (int j = 0; j < size; j++) ret[j] %= gmp_P;
   }
 
   // debug function
