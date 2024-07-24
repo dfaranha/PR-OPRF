@@ -52,7 +52,15 @@ public:
         // string str_res;
         while (true) {     
             prg.random_block(K, 3);
-            mpz_import(res.get_mpz_t(), 3, -1, 16, 0, 0, &K[0]);
+
+            // FIXME/TODO: WARNING: non-portable!!! as it depends on LIMB_BITS and endianness
+            // but much faster than
+            // mpz_import(res.get_mpz_t(), 3, -1, 16, 0, 0, &K[0]);
+            mp_limb_t *res_p;
+            res_p = mpz_limbs_write(res.get_mpz_t(), 8*48 / GMP_LIMB_BITS);
+            memcpy(res_p, K, 48);
+            mpz_limbs_finish(res.get_mpz_t(), 8*48 / GMP_LIMB_BITS);
+
             // str_res = "";
             // for (size_t i = 0; i < 3; i++) {
             //     uint64_t tmp;
