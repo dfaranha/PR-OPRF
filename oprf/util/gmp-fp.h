@@ -44,7 +44,11 @@ const string hex_tb[] = {"00", "01", "02", "03", "04", "05", "06", "07", "08", "
 
 mpz_class hex_compose(uint8_t *in) {
     mpz_class res;
-    mpz_import(res.get_mpz_t(), 48, -1, 1, 0, 0, in);
+    mp_limb_t *res_p;
+    res_p = mpz_limbs_write(res.get_mpz_t(), 8*48 / GMP_LIMB_BITS);
+    memcpy(res_p, in, 48);
+    mpz_limbs_finish(res.get_mpz_t(), 8*48 / GMP_LIMB_BITS);
+    //mpz_import(res.get_mpz_t(), 48, -1, 1, 0, 0, in);
     return res;
 }
 
