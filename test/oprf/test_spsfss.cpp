@@ -85,7 +85,7 @@ int main(int argc, char **argv) {
     spfss.correctness_check(ios[0], u[0]);
 
     double ttt = time_from(start);
-    std::cout << "base VOLE generation: " << ttt << " us" << std::endl;    
+    std::cout << "spsfss generation: " << ttt << " us" << std::endl;    
     uint64_t com2 = comm(ios) - com1;
     uint64_t com22 = comm2(ios) - com11;
     std::cout << "communication (B): " << com2 << std::endl;

@@ -105,7 +105,7 @@ public:
     io2->recv_data(&vvv[0], 48);
     mpz_class beta = hex_compose(&vvv[0]);
     int choice_pos;
-    io2->recv_data(&choice_pos, 48);
+    io2->recv_data(&choice_pos, sizeof(int));
 
     for (int i = 0; i < leave_n; i++) {
       io2->recv_data(&vvv[0], 48);
@@ -119,7 +119,7 @@ public:
         }
       } else {
         if (v != last_layer[i]) {
-          cout << "error in the non-hot possion!" << endl;
+          cout << "error in the non-hot possion!" << ' ' << i << endl;
           abort();
         }
       }
