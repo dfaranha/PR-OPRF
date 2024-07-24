@@ -22,11 +22,7 @@ mpz_class bit_compose(bool *in) {
 }
 
 void hex_decompose(mpz_class num, uint8_t *out) {
-    for (size_t i = 0; i < oprf_P_len / 8; i++) {
-        mpz_class tmp = num & 0xff;
-        out[i] = tmp.get_ui();
-        num >>= 8;
-    }
+    mpz_export(out, NULL, -1, 1, 0, 0, num.get_mpz_t());
 }
 
 const string hex_tb[] = {"00", "01", "02", "03", "04", "05", "06", "07", "08", "09", "0a", "0b", "0c", "0d", "0e", "0f",
@@ -47,9 +43,9 @@ const string hex_tb[] = {"00", "01", "02", "03", "04", "05", "06", "07", "08", "
                         "f0", "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "fa", "fb", "fc", "fd", "fe", "ff"};
 
 mpz_class hex_compose(uint8_t *in) {
-    string tmp = "";
-    for (int i = oprf_P_len / 8 - 1; i >=0; i--) tmp += hex_tb[ in[i] ];
-    return mpz_class(tmp, 16);
+    mpz_class res;
+    mpz_import(res.get_mpz_t(), 48, -1, 1, 0, 0, in);
+    return res;
 }
 
 #endif

@@ -13,8 +13,8 @@ public:
   size_t m;
   IO *io;
   mpz_class delta;
-  GMP_PRG_FP *G0 = nullptr;
-  GMP_PRG_FP *G1 = nullptr;
+  std::vector<GMP_PRG_FP> G0;
+  std::vector<GMP_PRG_FP> G1;
   bool *delta_bool = nullptr;
 
   OprfCope(int party, IO *io, size_t m) {
@@ -24,10 +24,6 @@ public:
   }
 
   ~OprfCope() {
-    if (G0 != nullptr)
-      delete[] G0;
-    if (G1 != nullptr)
-      delete[] G1;
     if (delta_bool != nullptr)
       delete[] delta_bool;    
   }
@@ -38,33 +34,29 @@ public:
     delta_bool = new bool[m];
     delta384_to_bool();
 
-    block* K = new block[m];
+    std::vector<block> K(m);
     OTCO<IO> otco(io);
-    otco.recv(K, delta_bool, m);
+    otco.recv(&K[0], delta_bool, m);
 
-    G0 = new GMP_PRG_FP[m];
+    G0.resize(m);
     for (int i = 0; i < m; ++i)
-      G0[i].reseed(K + i);
-
-    delete[] K;
+      G0[i].reseed(&K[i]);
   }
 
   // recver
   void initialize() {
-    block *K = new block[2 * m];
+    std::vector<block> K(2 * m);
     PRG prg;
-    prg.random_block(K, 2 * m);
+    prg.random_block(&K[0], 2 * m);
     OTCO<IO> otco(io);
-    otco.send(K, K + m, m);
+    otco.send(&K[0], &K[m], m);
 
-    G0 = new GMP_PRG_FP[m];
-    G1 = new GMP_PRG_FP[m];
+    G0.resize(m);
+    G1.resize(m);
     for (int i = 0; i < m; ++i) {
-      G0[i].reseed(K + i);
-      G1[i].reseed(K + m + i);
+      G0[i].reseed(&K[i]);
+      G1[i].reseed(&K[m + i]);
     }
-
-    delete[] K;
   }
 
   // sender
@@ -74,11 +66,10 @@ public:
 
     for (int i = 0; i < m; ++i) w[i] = G0[i].sample();
 
-    uint8_t *vvv = new uint8_t[m * oprf_P_len / 8];
-    io->recv_data(vvv, m * oprf_P_len / 8);
+    std::vector<uint8_t> vvv(m * oprf_P_len / 8);
+    io->recv_data(&vvv[0], m * oprf_P_len / 8);
 
-    for (int i = 0; i < m; ++i) v[i] = hex_compose(vvv + i * oprf_P_len / 8);
-    delete[] vvv;
+    for (int i = 0; i < m; ++i) v[i] = hex_compose(&vvv[i * oprf_P_len / 8]);
 
     for (int i = 0; i < m; ++i) {
       if (delta_bool[i]) {
@@ -99,13 +90,12 @@ public:
       for (int j = 0; j < size; j++) 
         w[i * size + j] = G0[i].sample();
 
-    uint8_t *vvv = new uint8_t[size * m * oprf_P_len / 8];
-    io->recv_data(vvv, size * m * oprf_P_len / 8);
+    std::vector<uint8_t> vvv(size * m * oprf_P_len / 8);
+    io->recv_data(&vvv[0], size * m * oprf_P_len / 8);
 
     for (int i = 0; i < m; i++)
       for (int j = 0; j < size; j++)
-        v[i * size + j] = hex_compose(vvv + (i * size + j) * oprf_P_len / 8);
-    delete[] vvv;
+        v[i * size + j] = hex_compose(&vvv[(i * size + j) * oprf_P_len / 8]);
 
     for (int i = 0; i < m; ++i) {
       if (delta_bool[i]) {
@@ -122,19 +112,18 @@ public:
   // recver
   mpz_class extend(mpz_class u) {
     std::vector<mpz_class> w0(m);
-    uint8_t *tau = new uint8_t[m * oprf_P_len / 8];
+    std::vector<uint8_t> tau(m * oprf_P_len / 8);
     for (int i = 0; i < m; ++i) {
       mpz_class w1;
       w0[i] = G0[i].sample();
       w1 = G1[i].sample();
       w1 = (w1 + u) % gmp_P;
       w1 = gmp_P - w1;
-      hex_decompose((w0[i] + w1) % gmp_P, tau + i * oprf_P_len / 8);
+      hex_decompose((w0[i] + w1) % gmp_P, &tau[i * oprf_P_len / 8]);
     }
 
-    io->send_data(tau, m * oprf_P_len / 8);
+    io->send_data(&tau[0], m * oprf_P_len / 8);
     io->flush();
-    delete[] tau;
 
     return prm2pr(w0);
   }
@@ -142,7 +131,7 @@ public:
   // recver batch
   void extend(std::vector<mpz_class> &ret, std::vector<mpz_class> &u, int size) {
     std::vector<mpz_class> w0(m * size);
-    uint8_t *tau = new uint8_t[size * m * oprf_P_len / 8];
+    std::vector<uint8_t> tau(size * m * oprf_P_len / 8);
     for (int i = 0; i < m; ++i) {
       mpz_class w1;
       for (int j = 0; j < size; j++) {
@@ -150,13 +139,12 @@ public:
         w1 = G1[i].sample();
         w1 = (w1 + u[j]) % gmp_P;
         w1 = gmp_P - w1;
-        hex_decompose((w0[i * size + j] + w1) % gmp_P, tau + (i * size + j) * oprf_P_len / 8);
+        hex_decompose((w0[i * size + j] + w1) % gmp_P, &tau[(i * size + j) * oprf_P_len / 8]);
       }
     }
 
-    io->send_data(tau, size * m * oprf_P_len / 8);
+    io->send_data(&tau[0], size * m * oprf_P_len / 8);
     io->flush();
-    delete[] tau;
 
     prm2pr(ret, w0, size);
   }
@@ -189,23 +177,24 @@ public:
 
   // debug function
   void check_triple(std::vector<mpz_class> &a, std::vector<mpz_class> &b, int sz) {
-    uint8_t *hex_de = new uint8_t[oprf_P_len / 8];
+    std::vector<uint8_t> hex_de(oprf_P_len / 8);
     if (party == ALICE) {
-      hex_decompose(delta, hex_de);
-      io->send_data(hex_de, oprf_P_len / 8);
+      hex_decompose(delta, &hex_de[0]);
+      io->send_data(&hex_de[0], oprf_P_len / 8);
       io->flush();
     } else {
-      io->recv_data(hex_de, oprf_P_len / 8);
-      delta = hex_compose(hex_de);
+      io->recv_data(&hex_de[0], oprf_P_len / 8);
+      delta = hex_compose(&hex_de[0]);
     }
     for (int i = 0; i < sz; i++) {
+      for (int j = 0; j < 48; j++) hex_de[j] = 0;
       if (party == ALICE) {
-        hex_decompose(b[i], hex_de);
-        io->send_data(hex_de, oprf_P_len / 8);
+        hex_decompose(b[i], &hex_de[0]);
+        io->send_data(&hex_de[0], oprf_P_len / 8);
         io->flush();
       } else {
-        io->recv_data(hex_de, oprf_P_len / 8);
-        mpz_class c = hex_compose(hex_de);
+        io->recv_data(&hex_de[0], oprf_P_len / 8);
+        mpz_class c = hex_compose(&hex_de[0]);
         mpz_class d = (delta * a[i] + c) % gmp_P;
         if (d != b[i]) {
           cout << "wrong triple!" << std::endl;
@@ -214,7 +203,6 @@ public:
       }
     }
     std::cout << "pass check" << std::endl;
-    delete[] hex_de;
   }
 };
 

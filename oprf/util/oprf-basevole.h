@@ -53,9 +53,9 @@ public:
   void sender_check(std::vector<mpz_class> &share, mpz_class b, const int size) {
     GMP_PRG_FP prg;
     mpz_class chi = prg.sample();
-    uint8_t *chi_de = new uint8_t[oprf_P_len / 8];
-    hex_decompose(chi, chi_de);
-    io->send_data(chi_de, oprf_P_len / 8);
+    std::vector<uint8_t> chi_de(oprf_P_len / 8);
+    hex_decompose(chi, &chi_de[0]);
+    io->send_data(&chi_de[0], oprf_P_len / 8);
     io->flush();
 
     // universal polynomial hash
@@ -68,10 +68,10 @@ public:
       acc_coeff = (acc_coeff * chi) % gmp_P;
     }
 
-    io->recv_data(chi_de, oprf_P_len / 8);
-    mpz_class xz0 = hex_compose(chi_de);
-    io->recv_data(chi_de, oprf_P_len / 8);
-    mpz_class xz1 = hex_compose(chi_de);
+    io->recv_data(&chi_de[0], oprf_P_len / 8);
+    mpz_class xz0 = hex_compose(&chi_de[0]);
+    io->recv_data(&chi_de[0], oprf_P_len / 8);
+    mpz_class xz1 = hex_compose(&chi_de[0]);
 
     xz1 = (xz1 * Delta) % gmp_P;
     acc_pi = (acc_pi + xz1) % gmp_P;
@@ -79,15 +79,13 @@ public:
       std::cout << "base VOLE check fails" << std::endl;
       abort();      
     }
-
-    delete[] chi_de;
   }
 
   // receiver check
   void recver_check(std::vector<mpz_class> &share, std::vector<mpz_class> &x, mpz_class c, mpz_class b, const int size) {
-    uint8_t *chi_de = new uint8_t[oprf_P_len / 8];
-    io->recv_data(chi_de, oprf_P_len / 8);
-    mpz_class chi = hex_compose(chi_de);
+    std::vector<uint8_t> chi_de(oprf_P_len / 8);
+    io->recv_data(&chi_de[0], oprf_P_len / 8);
+    mpz_class chi = hex_compose(&chi_de[0]);
 
     // uni poly hash
     mpz_class acc_coeff = chi;
@@ -101,12 +99,13 @@ public:
       acc_coeff = (acc_coeff * chi) % gmp_P;
     }
 
-    hex_decompose(acc_pi0, chi_de);
-    io->send_data(chi_de, oprf_P_len / 8);
-    hex_decompose(acc_pi1, chi_de);
-    io->send_data(chi_de, oprf_P_len / 8);
+    for (int i = 0; i < 48; i++) chi_de[i] = 0;
+    hex_decompose(acc_pi0, &chi_de[0]);
+    io->send_data(&chi_de[0], oprf_P_len / 8);
+    for (int i = 0; i < 48; i++) chi_de[i] = 0;
+    hex_decompose(acc_pi1, &chi_de[0]);
+    io->send_data(&chi_de[0], oprf_P_len / 8);
     io->flush();
-    delete[] chi_de;
   }
 
 };

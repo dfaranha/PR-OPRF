@@ -9,9 +9,13 @@ int port, party;
 const int threads = 1;
 
 int main(int argc, char **argv) {
-  mpz_class xxx = gmp_P;
-  std::cout << sizeof(xxx) << std::endl;
-  xxx = mpz_class("999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999");
-  std::cout << sizeof(xxx) << std::endl;
+  mpz_class num("500");
+  std::vector<uint8_t> x(48);
+  mpz_export(&x[0], NULL, -1, 1, 0, 0, num.get_mpz_t());
+  cout << (int)x[0] << ' ' << (int)x[1] << ' ' << (int)x[2] << ' ' << (int)x[3] << endl;
+  cout << num << endl;
+  mpz_class num2;
+  mpz_import(num2.get_mpz_t(), 48, -1, 1, 0, 0, &x[0]);
+  cout << num2 << endl;
   return 0;
 }
