@@ -9,32 +9,28 @@ public:
   int party;
   int m;
   IO *io;
-  OprfCope<IO> *cope;
+  OprfCope<IO> cope;
   mpz_class Delta;
 
   // SENDER
-  OprfBaseVole(int party, IO *io, mpz_class Delta) {
+  OprfBaseVole(int party, IO *io, mpz_class Delta) : cope(party, io, oprf_P_len) {
     this->party = party;
     this->io = io;
-    cope = new OprfCope<IO>(party, io, oprf_P_len);
     this->Delta = Delta;
-    cope->initialize(Delta);
+    cope.initialize(Delta);
   }
 
   // RECEIVER
-  OprfBaseVole(int party, IO *io) {
+  OprfBaseVole(int party, IO *io) : cope(party, io, oprf_P_len) {
     this->party = party;
     this->io = io;
-    cope = new OprfCope<IO>(party, io, oprf_P_len);
-    cope->initialize();
+    cope.initialize();
   }
-
-  ~OprfBaseVole() { delete cope; }
 
   // sender
   void triple_gen_send(std::vector<mpz_class> &share, const int size) {
-    cope->extend(share, size);
-    mpz_class b = cope->extend();
+    cope.extend(share, size);
+    mpz_class b = cope.extend();
     sender_check(share, b, size);
   }
 
@@ -43,9 +39,9 @@ public:
     x.resize(size);
     GMP_PRG_FP prg;
     for (int i = 0; i < size; i++) x[i] = prg.sample();
-    cope->extend(share, x, size);
+    cope.extend(share, x, size);
     mpz_class c = prg.sample();
-    mpz_class b = cope->extend(c);
+    mpz_class b = cope.extend(c);
     recver_check(share, x, c, b, size);
   }
 

@@ -2,7 +2,6 @@
 macro (add_test_executable_with_lib folder _name)
 	add_executable(test_${folder}_${_name} "${folder}/${_name}.cpp")
 	target_link_libraries(test_${folder}_${_name} ${EMP-OT_LIBRARIES} ${GMP_LIBRARIES} ${GMPXX_LIBRARIES} emp-zk)
-	target_compile_features(test_${folder}_${_name} PUBLIC cxx_std_17)
 endmacro()
 
 macro (add_test_case folder _name)
