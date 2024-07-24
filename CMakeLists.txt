@@ -1,8 +1,11 @@
-cmake_minimum_required (VERSION 3.0)
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED YES)
-project (emp-zk)
-set(NAME "emp-zk")
+cmake_minimum_required (VERSION 3.10)
+
+project (pr-oprf)
+set(NAME "pr-oprf")
+
+# specify the C++ standard
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 find_path(CMAKE_FOLDER NAMES cmake/emp-tool-config.cmake)
 include(${CMAKE_FOLDER}/cmake/emp-base.cmake)
@@ -24,5 +27,5 @@ install(DIRECTORY emp-zk DESTINATION include/)
 install(FILES cmake/emp-zk-config.cmake DESTINATION cmake/)
 install(TARGETS ${NAME} DESTINATION lib)
 
-ENABLE_TESTING()
-ADD_SUBDIRECTORY(test)
+enable_testing()
+add_subdirectory(test)
