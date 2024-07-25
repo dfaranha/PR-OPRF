@@ -24,7 +24,8 @@ public:
   mpz_class secret_share_x;
   __uint128_t **ggm_tree;
   mpz_class **ggm_tree_last;
-  __uint128_t *check_chialpha_buf = nullptr, *check_VW_buf = nullptr;
+  mpz_class *check_chialpha_buf = nullptr;
+  mpz_class *check_VW_buf = nullptr;
   mpz_class *triple_yz;
   ThreadPool *pool;
   std::vector<uint32_t> item_pos_recver;
@@ -52,8 +53,8 @@ public:
         (mpz_class **)malloc(this->item_n * sizeof(mpz_class *));
 
     if (party == BOB)
-      check_chialpha_buf = new __uint128_t[item_n];
-    check_VW_buf = new __uint128_t[item_n];
+      check_chialpha_buf = new mpz_class[item_n];
+    check_VW_buf = new mpz_class[item_n];
   }
 
   ~OprfMpfssRegFp() {
@@ -77,6 +78,7 @@ public:
 //     }
 //   }
 
+  // sender calss w/o betas
   void mpfss(OTPre<IO> *ot, mpz_class *triple_yz,
              __uint128_t *sparse_vector, mpz_class *sparse_last_vector) {
     this->triple_yz = triple_yz;
@@ -85,17 +87,10 @@ public:
 
   void mpfss(OTPre<IO> *ot, __uint128_t *sparse_vector, mpz_class *sparse_last_vector) {
     vector<OprfSpfssSenderFp<IO> *> senders;
-    vector<OprfSpfssRecverFp<IO> *> recvers;
     vector<future<void>> fut;
     for (int i = 0; i < tree_n; ++i) {
-      if (party == 1) {
-        senders.push_back(new OprfSpfssSenderFp<IO>(netio, tree_height));
-        ot->choices_sender();
-      } else {
-        recvers.push_back(new OprfSpfssRecverFp<IO>(netio, tree_height));
-        ot->choices_recver(recvers[i]->b);
-        item_pos_recver[i] = recvers[i]->get_index();
-      }
+      senders.push_back(new OprfSpfssSenderFp<IO>(netio, tree_height));
+      ot->choices_sender();
     }
     netio->flush();
     ot->reset();
@@ -104,21 +99,13 @@ public:
     uint32_t start = 0, end = width;
     for (int i = 0; i < threads - 1; ++i) {
       fut.push_back(pool->enqueue(
-          [this, start, end, width, senders, recvers, ot, sparse_vector, sparse_last_vector]() {
+          [this, start, end, width, senders, ot, sparse_vector, sparse_last_vector]() {
             for (auto i = start; i < end; ++i) {
-              if (party == ALICE) {
-                ggm_tree[i] = sparse_vector + i * leave_n;
-                ggm_tree_last[i] = sparse_last_vector + i * leave_n;
-                senders[i]->compute(ggm_tree[i], ggm_tree_last[i], secret_share_x, triple_yz[i]);
-                senders[i]->template send<OTPre<IO>>(ot, ios[start / width], i);
-                ios[start / width]->flush();
-              } else {
-                recvers[i]->template recv<OTPre<IO>>(ot, ios[start / width], i);
-                ggm_tree[i] = sparse_vector + i * leave_n;
-                ggm_tree_last[i] = sparse_last_vector + i * leave_n;
-                recvers[i]->compute(ggm_tree[i], ggm_tree_last[i], triple_yz[i]);
-                ios[start / width]->flush();
-              }
+              ggm_tree[i] = sparse_vector + i * leave_n;
+              ggm_tree_last[i] = sparse_last_vector + i * leave_n;
+              senders[i]->compute(ggm_tree[i], ggm_tree_last[i], secret_share_x, triple_yz[i]);
+              senders[i]->template send<OTPre<IO>>(ot, ios[start / width], i);
+              ios[start / width]->flush();
             }
           }));
       start = end;
@@ -126,73 +113,126 @@ public:
     }
     end = tree_n;
     for (auto i = start; i < end; ++i) {
-      if (party == ALICE) {
-        ggm_tree[i] = sparse_vector + i * leave_n;
-        ggm_tree_last[i] = sparse_last_vector + i * leave_n;
-        senders[i]->compute(ggm_tree[i], ggm_tree_last[i], secret_share_x, triple_yz[i]);
-        senders[i]->template send<OTPre<IO>>(ot, ios[threads - 1], i);
-        ios[threads - 1]->flush();
-      } else {
-        recvers[i]->template recv<OTPre<IO>>(ot, ios[threads - 1], i);
-        ggm_tree[i] = sparse_vector + i * leave_n;
-        ggm_tree_last[i] = sparse_last_vector + i * leave_n;
-        recvers[i]->compute(ggm_tree[i], ggm_tree_last[i], triple_yz[i]);
-        ios[threads - 1]->flush();
-      }
+      ggm_tree[i] = sparse_vector + i * leave_n;
+      ggm_tree_last[i] = sparse_last_vector + i * leave_n;
+      senders[i]->compute(ggm_tree[i], ggm_tree_last[i], secret_share_x, triple_yz[i]);
+      senders[i]->template send<OTPre<IO>>(ot, ios[threads - 1], i);
+      ios[threads - 1]->flush();
     }
     for (auto &f : fut)
       f.get();
 
-    // if (is_malicious) {
-    //   block *seed = new block[threads];
-    //   seed_expand(seed, threads);
-    //   vector<future<void>> fut;
-    //   uint32_t start = 0, end = width;
-    //   for (int i = 0; i < threads - 1; ++i) {
-    //     fut.push_back(
-    //         pool->enqueue([this, start, end, width, senders, recvers, seed]() {
-    //           for (auto i = start; i < end; ++i) {
-    //             if (party == ALICE) {
-    //               senders[i]->consistency_check_msg_gen(
-    //                   check_VW_buf[i], ios[start / width], seed[start / width]);
-    //             } else {
-    //               recvers[i]->consistency_check_msg_gen(
-    //                   check_chialpha_buf[i], check_VW_buf[i],
-    //                   ios[start / width], triple_yz[i], seed[start / width]);
-    //             }
-    //           }
-    //         }));
-    //     start = end;
-    //     end += width;
-    //   }
-    //   end = tree_n;
-    //   for (auto i = start; i < end; ++i) {
-    //     if (party == ALICE) {
-    //       senders[i]->consistency_check_msg_gen(
-    //           check_VW_buf[i], ios[threads - 1], seed[threads - 1]);
-    //     } else {
-    //       recvers[i]->consistency_check_msg_gen(
-    //           check_chialpha_buf[i], check_VW_buf[i], ios[threads - 1],
-    //           triple_yz[i], seed[threads - 1]);
-    //     }
-    //   }
-    //   for (auto &f : fut)
-    //     f.get();
-    //   delete[] seed;
-    // }
+    if (is_malicious) {
+      block *seed = new block[threads];
+      seed_expand(seed, threads);
+      vector<future<void>> fut;
+      uint32_t start = 0, end = width;
+      for (int i = 0; i < threads - 1; ++i) {
+        fut.push_back(
+            pool->enqueue([this, start, end, width, senders, seed]() {
+              for (auto i = start; i < end; ++i) {
+                senders[i]->consistency_check_msg_gen(
+                    check_VW_buf[i], seed[start / width]);
+              }
+            }));
+        start = end;
+        end += width;
+      }
+      end = tree_n;
+      for (auto i = start; i < end; ++i) {
+        senders[i]->consistency_check_msg_gen(
+            check_VW_buf[i], seed[threads - 1]);
+      }
+      for (auto &f : fut)
+        f.get();
+      delete[] seed;
+    }
 
-    // if (is_malicious) {
-    //   if (party == ALICE)
-    //     consistency_batch_check(triple_yz[tree_n], tree_n);
-    //   else
-    //     consistency_batch_check(triple_yz, triple_yz[tree_n], tree_n);
-    // }
+    if (is_malicious) consistency_batch_check(triple_yz[tree_n], tree_n);
 
     for (auto p : senders)
       delete p;
+  }
+
+  // receiver calls with beta
+  void mpfss(OTPre<IO> *ot, mpz_class *triple_yz,
+             __uint128_t *sparse_vector, mpz_class *sparse_last_vector, mpz_class *beta) {
+    this->triple_yz = triple_yz;
+    mpfss(ot, sparse_vector, sparse_last_vector, beta);
+  }
+
+  void mpfss(OTPre<IO> *ot, __uint128_t *sparse_vector, mpz_class *sparse_last_vector, mpz_class *beta) {
+    vector<OprfSpfssRecverFp<IO> *> recvers;
+    vector<future<void>> fut;
+    for (int i = 0; i < tree_n; ++i) {
+      recvers.push_back(new OprfSpfssRecverFp<IO>(netio, tree_height));
+      ot->choices_recver(recvers[i]->b);
+      item_pos_recver[i] = recvers[i]->get_index();
+    }
+    netio->flush();
+    ot->reset();
+
+    uint32_t width = tree_n / threads;
+    uint32_t start = 0, end = width;
+    for (int i = 0; i < threads - 1; ++i) {
+      fut.push_back(pool->enqueue(
+          [this, start, end, width, recvers, ot, sparse_vector, sparse_last_vector]() {
+            for (auto i = start; i < end; ++i) {
+              recvers[i]->template recv<OTPre<IO>>(ot, ios[start / width], i);
+              ggm_tree[i] = sparse_vector + i * leave_n;
+              ggm_tree_last[i] = sparse_last_vector + i * leave_n;
+              recvers[i]->compute(ggm_tree[i], ggm_tree_last[i], triple_yz[i]);
+              ios[start / width]->flush();
+            }
+          }));
+      start = end;
+      end += width;
+    }
+    end = tree_n;
+    for (auto i = start; i < end; ++i) {
+      recvers[i]->template recv<OTPre<IO>>(ot, ios[threads - 1], i);
+      ggm_tree[i] = sparse_vector + i * leave_n;
+      ggm_tree_last[i] = sparse_last_vector + i * leave_n;
+      recvers[i]->compute(ggm_tree[i], ggm_tree_last[i], triple_yz[i]);
+      ios[threads - 1]->flush();
+    }
+    for (auto &f : fut)
+      f.get();
+
+    if (is_malicious) {
+      block *seed = new block[threads];
+      seed_expand(seed, threads);
+      vector<future<void>> fut;
+      uint32_t start = 0, end = width;
+      for (int i = 0; i < threads - 1; ++i) {
+        fut.push_back(
+            pool->enqueue([this, start, end, width, recvers, seed, beta]() {
+              for (auto i = start; i < end; ++i) {
+                recvers[i]->consistency_check_msg_gen(
+                    check_chialpha_buf[i], check_VW_buf[i],
+                    beta[i], seed[start / width]);
+              }
+            }));
+        start = end;
+        end += width;
+      }
+      end = tree_n;
+      for (auto i = start; i < end; ++i) {
+        recvers[i]->consistency_check_msg_gen(
+            check_chialpha_buf[i], check_VW_buf[i], 
+            beta[i], seed[threads - 1]);
+      }
+      for (auto &f : fut)
+        f.get();
+      delete[] seed;
+    }
+
+    if (is_malicious) consistency_batch_check(beta, triple_yz[tree_n], tree_n);
+
     for (auto p : recvers)
       delete p;
   }
+
 
   void seed_expand(block *seed, int threads) {
     block sd = zero_block;
@@ -207,44 +247,55 @@ public:
     prg2.random_block(seed, threads);
   }
 
-//   void consistency_batch_check(__uint128_t y, int num) {
-//     uint64_t x_star;
-//     netio->recv_data(&x_star, sizeof(uint64_t));
-//     uint64_t tmp = mult_mod(secret_share_x, x_star);
-//     tmp = add_mod((uint64_t)y, tmp);
-//     uint64_t vb = pr - tmp; // y_star
+  void consistency_batch_check(mpz_class y, int num) {
 
-//     for (int i = 0; i < num; ++i)
-//       vb = add_mod(vb, (uint64_t)check_VW_buf[i]);
-//     Hash hash;
-//     block h = hash.hash_for_block(&vb, sizeof(uint64_t));
-//     netio->send_data(&h, sizeof(block));
-//     netio->flush();
-//   }
+    std::vector<uint8_t> ext(48);
+    netio->recv_data(&ext[0], 48);
 
-//   void consistency_batch_check(__uint128_t *delta2, __uint128_t z, int num) {
-//     uint64_t beta_mul_chialpha = (uint64_t)0;
-//     for (int i = 0; i < num; ++i) {
-//       uint64_t tmp = mult_mod(_mm_extract_epi64((block)delta2[i], 1),
-//                               check_chialpha_buf[i]);
-//       beta_mul_chialpha = add_mod(beta_mul_chialpha, tmp);
-//     }
-//     uint64_t x_star = PR - beta_mul_chialpha;
-//     x_star = add_mod(_mm_extract_epi64((block)z, 1), x_star);
-//     netio->send_data(&x_star, sizeof(uint64_t));
-//     netio->flush();
+    mpz_class x_star = hex_compose(&ext[0]);
 
-//     uint64_t va = PR - _mm_extract_epi64((block)z, 0);
-//     for (int i = 0; i < num; ++i)
-//       va = mod(va + check_VW_buf[i], pr);
+    mpz_class tmp = ((secret_share_x * x_star) + y) % gmp_P;
+    tmp = gmp_P - tmp; // y_star = vb
 
-//     Hash hash;
-//     block h = hash.hash_for_block(&va, sizeof(uint64_t));
-//     block r;
-//     netio->recv_data(&r, sizeof(block));
-//     if (!cmpBlock(&r, &h, 1))
-//       error("MPFSS batch check fails");
-//   }
+    for (int i = 0; i < num; ++i) tmp += check_VW_buf[i];
+    tmp %= gmp_P;
+
+    for (int i = 0; i < 48; i++) ext[i] = 0;
+    hex_decompose(tmp, &ext[0]);
+    Hash hash;
+    block h = hash.hash_for_block(&ext[0], 48);
+    netio->send_data(&h, sizeof(block));
+    netio->flush();
+  }
+
+  void consistency_batch_check(mpz_class *beta, mpz_class z, int num) {
+
+    mpz_class beta_mul_chialpha = 0;
+    for (int i = 0; i < num; i++) beta_mul_chialpha += check_chialpha_buf[i] * beta[i];
+    beta_mul_chialpha %= gmp_P;
+    mpz_class x_star = gmp_P - beta_mul_chialpha;
+    x_star += beta[num];
+    x_star %= gmp_P;
+
+    std::vector<uint8_t> ext(48);
+    hex_decompose(x_star, &ext[0]);
+    netio->send_data(&ext[0], 48);
+    netio->flush();
+
+    mpz_class va = gmp_P - z;
+    for (int i = 0; i < num; i++) va += check_VW_buf[i];
+    va %= gmp_P;
+
+    for (int i = 0; i < 48; i++) ext[i] = 0;
+    hex_decompose(va, &ext[0]);
+
+    Hash hash;
+    block h = hash.hash_for_block(&ext[0], 48);
+    block r;
+    netio->recv_data(&r, sizeof(block));
+    if (!cmpBlock(&r, &h, 1))
+      error("MPFSS batch check fails");
+  }
 
   // debug -- sender
   void check_correctness_sender(IO *io2) {

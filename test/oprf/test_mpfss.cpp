@@ -44,6 +44,7 @@ int main(int argc, char **argv) {
 
     OprfBaseVole<BoolIO<NetIO>> basevole(party, ios[0], delta);
     OprfMpfssRegFp<BoolIO<NetIO>> mpfss(party, threads, total_n, t, h, pool, ios);
+    mpfss.set_malicious();
     BaseCot<BoolIO<NetIO>> cot(party, ios[0], true);
     cot.cot_gen_pre();
 
@@ -52,8 +53,8 @@ int main(int argc, char **argv) {
     OTPre<BoolIO<NetIO>> *pre_ot = new OTPre<BoolIO<NetIO>>(ios[0], h, t);
     cot.cot_gen(pre_ot, pre_ot->n);
 
-    std::vector<mpz_class> v(t);
-    basevole.triple_gen_send(v, t);
+    std::vector<mpz_class> v(t+1);
+    basevole.triple_gen_send(v, t+1);
 
     __uint128_t *ggm_tree_mem = new __uint128_t[total_n];
 
@@ -77,6 +78,7 @@ int main(int argc, char **argv) {
 
     OprfBaseVole<BoolIO<NetIO>> basevole(party, ios[0]);
     OprfMpfssRegFp<BoolIO<NetIO>> mpfss(party, threads, total_n, t, h, pool, ios);
+    mpfss.set_malicious();
     BaseCot<BoolIO<NetIO>> cot(party, ios[0], true);
     cot.cot_gen_pre();
     
@@ -85,14 +87,14 @@ int main(int argc, char **argv) {
     OTPre<BoolIO<NetIO>> *pre_ot = new OTPre<BoolIO<NetIO>>(ios[0], h, t);
     cot.cot_gen(pre_ot, pre_ot->n);
 
-    std::vector<mpz_class> u(t);
-    std::vector<mpz_class> w(t);
-    basevole.triple_gen_recv(w, u, t);
+    std::vector<mpz_class> w(t+1);
+    std::vector<mpz_class> u(t+1);    
+    basevole.triple_gen_recv(w, u, t+1);
 
     __uint128_t *ggm_tree_mem = new __uint128_t[total_n];
 
     mpfss.recver_init();
-    mpfss.mpfss(pre_ot, &w[0], ggm_tree_mem, &last[0]);
+    mpfss.mpfss(pre_ot, &w[0], ggm_tree_mem, &last[0], &u[0]);
 
     double ttt = time_from(start);
     std::cout << "spsfss generation: " << ttt << " us" << std::endl;    
