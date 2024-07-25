@@ -246,53 +246,51 @@ public:
 //       error("MPFSS batch check fails");
 //   }
 
-//   // debug
-//   void check_correctness(IO *io2, __uint128_t *vector, __uint128_t gamma,
-//                          __uint128_t y) {
-//     io2->send_data(vector, leave_n * sizeof(__uint128_t));
-//     io2->send_data(&gamma, sizeof(__uint128_t));
-//     io2->send_data(&secret_share_x, sizeof(__uint128_t));
+  // debug -- sender
+  void check_correctness_sender(IO *io2) {
+    std::vector<uint8_t> ext(48);
+    hex_decompose(secret_share_x, &ext[0]);
+    io2->send_data(&ext[0], 48);
+    io2->flush();
 
-//     io2->send_data(&y, sizeof(__uint128_t));
-//   }
+    cout << secret_share_x << endl;
+    
+    for (int i = 0; i < tree_n; i++) {
+      for (int j = 0; j < leave_n; j++) {
+        for (int t = 0; t < 48; t++) ext[t] = 0;
+        hex_decompose(ggm_tree_last[i][j], &ext[0]);
+        io2->send_data(&ext[0], 48);
+        io2->flush();
+      }
+    }
+  }
 
-//   // debug
-//   void check_correctness(IO *io2, __uint128_t *vector, __uint128_t beta,
-//                          __uint128_t delta2, int pos, __uint128_t x,
-//                          __uint128_t z) {
-//     __uint128_t *sendervec = new __uint128_t[leave_n];
-//     __uint128_t gamma, delta, y;
-//     io2->recv_data(sendervec, leave_n * sizeof(__uint128_t));
-//     io2->recv_data(&gamma, sizeof(__uint128_t));
-//     io2->recv_data(&delta, sizeof(__uint128_t));
-//     __uint128_t delta3 = delta;
-//     io2->recv_data(&y, sizeof(__uint128_t));
+  // debug -- recver
+  void check_correctness_recver(IO *io2, mpz_class *beta) {    
+    std::vector<uint8_t> ext(48);
+    io2->recv_data(&ext[0], 48);
+    mpz_class delta = hex_compose(&ext[0]);
 
-//     for (int i = 0; i < leave_n; ++i) {
-//       if (i == pos)
-//         continue;
-//       if (vector[i] != sendervec[i]) {
-//         std::cout << "wrong node at: " << i << " " << (uint64_t)vector[i] << " "
-//                   << (uint64_t)sendervec[i] << std::endl;
-//         abort();
-//       }
-//     }
+    for (int i = 0; i < tree_n; i++) {
+      for (int j = 0; j < leave_n; j++) {
+        io2->recv_data(&ext[0], 48);
+        mpz_class V = hex_compose(&ext[0]);
+        if (j == item_pos_recver[i]) {
+          if ((beta[i] * delta + V) % gmp_P != ggm_tree_last[i][j]) {
+            cout << "wrong in hot "  << i << ' ' << j << endl;
+            cout << beta[i] << ' ' << delta << ' ' << V << ' ' << ggm_tree_last[i][j] << endl;
+            abort();
+          }
+        } else {
+          if (V != ggm_tree_last[i][j]) {
+            cout << "wrong in non-hot " << i << ' ' << j << endl;
+            abort();
+          }
+        }
+      }
+    }
+    cout << "check pass" << endl;
+  }
 
-//     delta = mod(delta * beta, pr);
-//     delta = mod(delta + sendervec[pos], pr);
-//     if (delta != vector[pos]) {
-//       std::cout << "wrong secret" << std::endl;
-//       abort();
-//     } else
-//       std::cout << "right vector" << std::endl;
-
-//     delta3 = mod(delta3 * x, pr);
-//     delta3 = mod(delta3 + y, pr);
-//     if (delta3 != z) {
-//       std::cout << "wrong triple" << std::endl;
-//       abort();
-//     } else
-//       std::cout << "right check triple" << std::endl;
-//   }
 };
 #endif
