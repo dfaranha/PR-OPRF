@@ -19,7 +19,7 @@ public:
   IO *io;
   mpz_class share;
   mpz_class choice_beta;
-  std::vector<mpz_class> last_layer;
+  mpz_class *last_layer;
 
   OprfSpfssRecverFp(IO *io, int depth_in) {
     this->io = io;
@@ -56,13 +56,14 @@ public:
   // receive the message and reconstruct the tree
   // j: position of the secret, begins from 0
   // delta2 only use low 64 bits
-  void compute(__uint128_t *ggm_tree_mem, const mpz_class &delta2) {
+  void compute(__uint128_t *ggm_tree_mem, mpz_class *last, const mpz_class &delta2) {
     ggm_tree_int = ggm_tree_mem;
     this->ggm_tree = (block *)ggm_tree_mem;
+    last_layer = last;
     ggm_tree_reconstruction(b, m);
     ggm_tree[choice_pos] = zero_block;
 
-    last_layer.resize(leave_n);
+    // last_layer.resize(leave_n);
     mpz_class nodes_sum = 0;
     for (int i = 0; i < leave_n; ++i) {
       if (i == choice_pos) continue;

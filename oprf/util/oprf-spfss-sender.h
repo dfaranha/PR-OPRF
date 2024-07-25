@@ -16,7 +16,8 @@ public:
   block *ggm_tree, *m;
   mpz_class delta;
   mpz_class secret_sum;  
-  std::vector<mpz_class> last_layer;
+  mpz_class *last_layer;
+  // std::vector<mpz_class> last_layer;
   IO *io;
   int depth;
   int leave_n;
@@ -37,9 +38,10 @@ public:
   ~OprfSpfssSenderFp() { delete[] m; }
 
   // send the nodes by oblivious transfer
-  void compute(__uint128_t *ggm_tree_mem, const mpz_class &secret,
+  void compute(__uint128_t *ggm_tree_mem, mpz_class *last, const mpz_class &secret,
                const mpz_class &gamma) {
     this->delta = secret;
+    last_layer = last;
     ggm_tree_gen(m, m + depth - 1, ggm_tree_mem, gamma);
   }
 
@@ -73,7 +75,7 @@ public:
     }
     delete prp;
     secret_sum = 0;
-    last_layer.resize(leave_n);
+    // last_layer.resize(leave_n);
     for (int i = 0; i < leave_n; ++i) {
       GMP_PRG_FP layer_prg(&ggm_tree[i]);
       last_layer[i] = layer_prg.sample();

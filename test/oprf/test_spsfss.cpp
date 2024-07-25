@@ -31,6 +31,8 @@ int main(int argc, char **argv) {
 
   // tmptmp
   if (party == ALICE) {
+    std::vector<mpz_class> last(1<<9);
+
     GMP_PRG_FP prgdelta;
     mpz_class delta = prgdelta.sample();
 
@@ -48,7 +50,7 @@ int main(int argc, char **argv) {
     std::vector<mpz_class> v(1);
     basevole.triple_gen_send(v, 1);
     __uint128_t *ggm_tree_mem = new __uint128_t[1 << 9];
-    spfss.compute(ggm_tree_mem, delta, v[0]);
+    spfss.compute(ggm_tree_mem, &last[0], delta, v[0]);
     spfss.template send<OTPre<BoolIO<NetIO>>>(pre_ot, ios[0], 0);
 
     double ttt = time_from(start);
@@ -62,6 +64,7 @@ int main(int argc, char **argv) {
 
     delete[] ggm_tree_mem;
   } else {
+    std::vector<mpz_class> last(1<<9);
     OprfBaseVole<BoolIO<NetIO>> basevole(party, ios[0]);
     OprfSpfssRecverFp<BoolIO<NetIO>> spfss(ios[0], 10);
     BaseCot<BoolIO<NetIO>> cot(party, ios[0], true);
@@ -80,7 +83,7 @@ int main(int argc, char **argv) {
 
     spfss.template recv<OTPre<BoolIO<NetIO>>>(pre_ot, ios[0], 0);
     __uint128_t *ggm_tree_mem = new __uint128_t[1<<9];
-    spfss.compute(ggm_tree_mem, w[0]);
+    spfss.compute(ggm_tree_mem, &last[0], w[0]);
 
     double ttt = time_from(start);
     std::cout << "spsfss generation: " << ttt << " us" << std::endl;    

@@ -13,4 +13,7 @@
 #include "oprf/util/oprf-spfss-sender.h"
 #include "oprf/util/oprf-spfss-recver.h"
 
+// mp vole
+#include "oprf/util/oprf-mpfss.h"
+
 #endif
