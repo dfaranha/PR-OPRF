@@ -18,6 +18,7 @@ public:
   int choice_pos, depth, leave_n;
   IO *io;
   mpz_class share;
+  mpz_class choice_beta;
   std::vector<mpz_class> last_layer;
 
   OprfSpfssRecverFp(IO *io, int depth_in) {
@@ -104,25 +105,21 @@ public:
       prp->node_expand_2to4(&ggm_tree[i * 2], &ggm_tree[i]);
   }
 
-  // void consistency_check_msg_gen(__uint128_t &chi_alpha, __uint128_t &W,
-  //                                IO *io2, __uint128_t beta, block seed) {
-  //   __uint128_t *chi = new __uint128_t[leave_n];
-  //   Hash hash;
-  //   __uint128_t digest =
-  //       mod(_mm_extract_epi64(hash.hash_for_block(&seed, sizeof(block)), 0));
-  //   uni_hash_coeff_gen(chi, digest, leave_n);
+  void consistency_check_msg_gen(mpz_class &chi_alpha, mpz_class &W, const mpz_class &beta, block seed) {
+    choice_beta = beta;
 
-  //   chi_alpha = chi[choice_pos];
+    GMP_PRG_FP chalprg(&seed);
+    mpz_class chal = chalprg.sample();    
 
-  //   // W = \sum{chi_i*w_i}
-  //   W = vector_inn_prdt_sum_red(chi, (__uint128_t *)ggm_tree, leave_n);
+    std::vector<mpz_class> chi(leave_n);
+    chi[0] = chal;
+    for (int i = 1; i < leave_n; i++) chi[i] = chi[i-1] * chal % gmp_P;
 
-  //   uint64_t tmp2 = _mm_extract_epi64((block)beta, 1);
-  //   ggm_tree_int[choice_pos] =
-  //       ((__uint128_t)tmp2 << 64) ^ ggm_tree_int[choice_pos];
-
-  //   delete[] chi;
-  // }
+    chi_alpha = chi[choice_pos];
+    W = 0;
+    for (int i = 0; i < leave_n; i++) W += chi[i] * last_layer[i];
+    W %= gmp_P;
+  }
 
   // correctness check
   void correctness_check(IO *io2, mpz_class beta) {

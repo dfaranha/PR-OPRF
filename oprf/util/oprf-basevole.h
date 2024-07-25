@@ -60,9 +60,10 @@ public:
 
     // inner product
     for (int i = 0; i < size; i++) {
-      acc_pi = (acc_pi + acc_coeff * share[i]) % gmp_P;
+      acc_pi = (acc_pi + acc_coeff * share[i]);
       acc_coeff = (acc_coeff * chi) % gmp_P;
     }
+    acc_pi %= gmp_P;
 
     io->recv_data(&chi_de[0], oprf_P_len / 8);
     mpz_class xz0 = hex_compose(&chi_de[0]);
@@ -90,10 +91,12 @@ public:
 
     // inner product
     for (int i = 0; i < size; i++) {
-      acc_pi0 = (acc_pi0 + acc_coeff * share[i]) % gmp_P;
-      acc_pi1 = (acc_pi1 + acc_coeff * x[i]) % gmp_P;
+      acc_pi0 = (acc_pi0 + acc_coeff * share[i]); // % gmp_P;
+      acc_pi1 = (acc_pi1 + acc_coeff * x[i]); // % gmp_P;
       acc_coeff = (acc_coeff * chi) % gmp_P;
     }
+    acc_pi0 %= gmp_P;
+    acc_pi1 %= gmp_P;
 
     for (int i = 0; i < 48; i++) chi_de[i] = 0;
     hex_decompose(acc_pi0, &chi_de[0]);

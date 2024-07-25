@@ -85,19 +85,17 @@ public:
   }
 
 
-  // // consistency check: Protocol PI_spsVOLE
-  // void consistency_check_msg_gen(__uint128_t &V, IO *io2, block seed) {
-  //   __uint128_t *chi = new __uint128_t[leave_n];
-  //   Hash hash;
-  //   __uint128_t digest =
-  //       mod(_mm_extract_epi64(hash.hash_for_block(&seed, sizeof(block)), 0));
-  //   uni_hash_coeff_gen(chi, digest, leave_n);
-
-  //   // V = \sum{chi_i*v_i}
-  //   V = vector_inn_prdt_sum_red(chi, (__uint128_t *)ggm_tree, leave_n);
-
-  //   delete[] chi;
-  // }
+  // consistency check: Protocol PI_spsVOLE
+  void consistency_check_msg_gen(mpz_class &V, block seed) {
+    GMP_PRG_FP chalprg(&seed);
+    mpz_class chal = chalprg.sample();
+    V = 0;
+    mpz_class coeff = chal;
+    for (int i = 0; i < leave_n; i++) {
+      V = (V + coeff * last_layer[i]) % gmp_P;
+      coeff = (coeff * chal) % gmp_P;
+    }
+  }
 
   // correctness debug
   void correctness_check(IO *io2) {

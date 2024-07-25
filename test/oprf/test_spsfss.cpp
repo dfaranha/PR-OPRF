@@ -51,14 +51,14 @@ int main(int argc, char **argv) {
     spfss.compute(ggm_tree_mem, delta, v[0]);
     spfss.template send<OTPre<BoolIO<NetIO>>>(pre_ot, ios[0], 0);
 
-    spfss.correctness_check(ios[0]);
-
     double ttt = time_from(start);
     std::cout << "spsfss generation: " << ttt << " us" << std::endl; 
     uint64_t com2 = comm(ios) - com1;
     uint64_t com22 = comm2(ios) - com11;
     std::cout << "communication (B): " << com2 << std::endl;
     std::cout << "communication (B): " << com22 << std::endl;
+
+    spfss.correctness_check(ios[0]);    
 
     delete[] ggm_tree_mem;
   } else {
@@ -82,14 +82,14 @@ int main(int argc, char **argv) {
     __uint128_t *ggm_tree_mem = new __uint128_t[1<<9];
     spfss.compute(ggm_tree_mem, w[0]);
 
-    spfss.correctness_check(ios[0], u[0]);
-
     double ttt = time_from(start);
     std::cout << "spsfss generation: " << ttt << " us" << std::endl;    
     uint64_t com2 = comm(ios) - com1;
     uint64_t com22 = comm2(ios) - com11;
     std::cout << "communication (B): " << com2 << std::endl;
     std::cout << "communication (B): " << com22 << std::endl;
+
+    spfss.correctness_check(ios[0], u[0]);
 
     delete[] ggm_tree_mem;
   }
