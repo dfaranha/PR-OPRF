@@ -90,13 +90,18 @@ public:
 
     for (int i = 0; i < m; i++)
       for (int j = 0; j < size; j++)
-        v[i * size + j] = hex_compose(&vvv[(i * size + j) * oprf_P_len / 8]);
+        hex_compose(v[i * size + j], &vvv[(i * size + j) * oprf_P_len / 8]);
+
+    mpz_class tmp;
 
     for (int i = 0; i < m; ++i) {
       if (delta_bool[i]) {
-        for (int j = 0; j < size; ++j) {        
-          w[i * size + j] += v[i * size + j];
-          w[i * size + j] %= gmp_P;
+        for (int j = 0; j < size; ++j) {
+          mpz_add(tmp.get_mpz_t(), w[i * size + j].get_mpz_t(), v[i * size + j].get_mpz_t());
+          mpz_mod(w[i * size + j].get_mpz_t(), tmp.get_mpz_t(), gmp_P.get_mpz_t());
+
+//          tmp = w[i * size + j] + v[i * size + j];
+//          w[i * size + j] = tmp % gmp_P;
         }
       }
     }
