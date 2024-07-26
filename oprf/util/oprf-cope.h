@@ -169,7 +169,7 @@ public:
     mpz_class tmp;
     for (int i = 0; i < m; i++) {
       for (int j = 0; j < size; j++) {
-        tmp = (w[i * size + j] << i) % gmp_P;
+        tmp = (w[i * size + j] << i); // % gmp_P;
         ret[j] = (ret[j] + tmp); // % gmp_P;
       }
     }
