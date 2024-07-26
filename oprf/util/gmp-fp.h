@@ -42,14 +42,20 @@ const string hex_tb[] = {"00", "01", "02", "03", "04", "05", "06", "07", "08", "
                         "e0", "e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "e9", "ea", "eb", "ec", "ed", "ee", "ef",
                         "f0", "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "fa", "fb", "fc", "fd", "fe", "ff"};
 
-mpz_class hex_compose(uint8_t *in) {
-    mpz_class res;
+void hex_compose(mpz_class &res, uint8_t *in) {
     mp_limb_t *res_p;
     res_p = mpz_limbs_write(res.get_mpz_t(), 8*48 / GMP_LIMB_BITS);
     memcpy(res_p, in, 48);
     mpz_limbs_finish(res.get_mpz_t(), 8*48 / GMP_LIMB_BITS);
     //mpz_import(res.get_mpz_t(), 48, -1, 1, 0, 0, in);
+}
+
+mpz_class hex_compose(uint8_t *in) {
+    mpz_class res;
+    hex_compose(res, in);
     return res;
 }
+
+
 
 #endif
