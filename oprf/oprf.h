@@ -16,4 +16,7 @@
 // mp vole
 #include "oprf/util/oprf-mpfss.h"
 
+// oprf lpn
+#include "oprf/util/oprf-lpn.h"
+
 #endif

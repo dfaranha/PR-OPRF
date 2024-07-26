@@ -13,7 +13,7 @@ using namespace emp;
 using namespace std;
 
 int party, port;
-const int threads = 4;
+const int threads = 1;
 
 void test_vole_triple(NetIO *ios[threads + 1], int party) {
   VoleTriple<NetIO> vtriple(party, threads, ios);
