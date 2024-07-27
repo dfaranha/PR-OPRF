@@ -35,7 +35,7 @@ void test_vole_triple(NetIO *ios[threads + 1], int party) {
     vtriple.check_triple(0, vtriple.pre_yz, vtriple.param.n_pre);
   }
 
-  int triple_need = vtriple.ot_limit;
+  int triple_need = 30000000;
   auto start = clock_start();
   __uint128_t *buf = new __uint128_t[triple_need];
   if (party == ALICE) {

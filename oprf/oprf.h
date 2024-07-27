@@ -19,4 +19,7 @@
 // oprf lpn
 #include "oprf/util/oprf-lpn.h"
 
+// oprf vole generator
+#include "oprf/util/oprf-vole-triple.h"
+
 #endif
