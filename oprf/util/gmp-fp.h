@@ -5,7 +5,12 @@
 #include <vector>
 #include <string>
 
-static mpz_class gmp_P("39402006196394479212279040100143613805079739270465446667948293404245721760140286615427945036794788117771363932962817");
+static mpz_class gmp_F("115792089237316195423570985008687907853269984665640564039457584007913129606561");
+static mpz_class gmp_P = (gmp_F << 128) + 1;
+static mpz_class gmp_P_m2 = gmp_P - 2;
+//static mpz_class gmp_P("39402006196394479212279040100143613805079739270465446667948293404245721760140286615427945036794788117771363932962817");
+static std::vector<bool> bit_gmp_P_m2;
+static std::vector<bool> bit_gmp_F;
 #define oprf_P_len 384
 
 void bit_decompose(mpz_class num, bool *out) {
@@ -13,6 +18,43 @@ void bit_decompose(mpz_class num, bool *out) {
         out[i] = ((num & 1) == 1);
         num >>= 1;
     }
+}
+
+void bit_decompose(mpz_class num, int size, std::vector<bool> &out) {
+    for (size_t i = 0; i < size; i++) {
+        out[i] = ((num & 1) == 1);
+        num >>= 1;
+    }
+}
+
+// the setup needs to be adjusted if P is changed
+void gmp_setup() {
+    bit_gmp_P_m2.resize(384);
+    bit_decompose(gmp_P_m2, 384, bit_gmp_P_m2);
+    bit_gmp_F.resize(256);
+    bit_decompose(gmp_F, 256, bit_gmp_F);
+}
+
+mpz_class gmp_inverse(const mpz_class &in) {
+    mpz_class res = 1;
+    mpz_class sq = in;
+    for (int i = 0; i < 384; i++) {
+        if (bit_gmp_P_m2[i]) res = (res * sq);
+        sq = sq * sq % gmp_P;
+    }
+    res %= gmp_P;
+    return res;
+}
+
+mpz_class gmp_raise(const mpz_class &in) {
+    mpz_class res = 1;
+    mpz_class sq = in;
+    for (int i = 0; i < 256; i++) {
+        if (bit_gmp_F[i]) res = (res * sq);
+        sq = sq * sq % gmp_P;
+    }
+    res %= gmp_P;
+    return res;
 }
 
 mpz_class bit_compose(bool *in) {
