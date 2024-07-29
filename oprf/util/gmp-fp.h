@@ -35,25 +35,29 @@ void gmp_setup() {
     bit_decompose(gmp_F, 256, bit_gmp_F);
 }
 
+static mpz_class minorone("-1");
+
 mpz_class gmp_inverse(const mpz_class &in) {
-    mpz_class res = 1;
-    mpz_class sq = in;
-    for (int i = 0; i < 384; i++) {
-        if (bit_gmp_P_m2[i]) res = (res * sq);
-        sq = sq * sq % gmp_P;
-    }
-    res %= gmp_P;
+    
+    mpz_class res;
+    mpz_powm(res.get_mpz_t(), in.get_mpz_t(), minorone.get_mpz_t(), gmp_P.get_mpz_t());
+    // mpz_class res = 1;
+    // mpz_class sq = in;
+    // for (int i = 0; i < 384; i++) {
+    //     if (bit_gmp_P_m2[i]) res = (res * sq) % gmp_P;
+    //     sq = sq * sq % gmp_P;
+    // }
     return res;
 }
 
 mpz_class gmp_raise(const mpz_class &in) {
-    mpz_class res = 1;
-    mpz_class sq = in;
-    for (int i = 0; i < 256; i++) {
-        if (bit_gmp_F[i]) res = (res * sq);
-        sq = sq * sq % gmp_P;
-    }
-    res %= gmp_P;
+    mpz_class res;
+    mpz_powm(res.get_mpz_t(), in.get_mpz_t(), gmp_F.get_mpz_t(), gmp_P.get_mpz_t());
+    // mpz_class sq = in;
+    // for (int i = 0; i < 256; i++) {
+    //     if (bit_gmp_F[i]) res = (res * sq) % gmp_P;
+    //     sq = sq * sq % gmp_P;
+    // }
     return res;
 }
 
