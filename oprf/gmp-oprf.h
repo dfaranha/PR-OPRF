@@ -18,17 +18,25 @@ public:
   mpz_class mac_oprf_key;
   std::vector<mpz_class> oprf_mac, oprf_a;
   std::vector<mpz_class> zk_mac;
+  std::vector<mpz_class> alpha, alpha_mac;
   int cur;
+  int epsilon; // optimization parameter
 
   bool is_malicious = false;
 
-  Oprf(int party, int threads, IO **ios) : vole(party, threads, ios), zkvole(3-party, threads, ios) {
+  Oprf(int party, int threads, IO **ios, int epsilon = 4) : vole(party, threads, ios), zkvole(3-party, threads, ios) {
+    if (128 % epsilon != 0 || epsilon > 16) {
+      cout << "invalid epsilon!" << endl;
+      abort();
+    }
+    this->epsilon = epsilon;    
     this->io = ios[0];
     this->ios = ios;
     this->party = party;
     this->threads = threads;
 
-    gmp_setup();
+    // gmp_setup();
+    generate_coeff(epsilon); // this is only useful for the malicious case
   }
 
   void setup(mpz_class delta) {
@@ -186,8 +194,137 @@ public:
     //   cout << "correctness check pass" << endl;
     // }
 
-    // now, we need to prepare alpha^e
-    
+    // now, we need to prepare alpha^e (#total = sz)
+    // std::vector<mpz_class> alpha, alpha_mac;    
+    uint32_t coeff_cnt = 1 << epsilon;    
+    int inter_cnt = 128 / epsilon;
+    if (party == ALICE) {
+      std::vector<mpz_class> r(sz * (inter_cnt + 1));
+      std::vector<mpz_class> r_mac(sz * (inter_cnt + 1));
+      zkvole.extend_recver(&r_mac[0], &r[0], sz * (inter_cnt + 1));
+
+      // commit the intermedia value
+      std::vector<uint8_t> diff(sz * inter_cnt * 48);
+      for (int i = 0; i < sz; i++) {
+        mpz_class cur_alpha = r[i * (inter_cnt + 1)];
+        for (int j = 0; j < inter_cnt; j++) {
+          //for (int t = 0; t < epsilon; t++) cur_alpha = (cur_alpha * cur_alpha) % gmp_P;
+          mpz_class next_cur;
+          mpz_powm_ui(next_cur.get_mpz_t(), cur_alpha.get_mpz_t(), coeff_cnt, gmp_P.get_mpz_t());
+          cur_alpha = next_cur;
+          hex_decompose( (cur_alpha + gmp_P - r[i * (inter_cnt + 1) + 1 + j]) % gmp_P, &diff[ (i * inter_cnt + j) * 48 ]);
+          r[i * (inter_cnt + 1) + 1 + j] = cur_alpha;
+        }
+      }
+      io->send_data(&diff[0], sz * inter_cnt * 48);
+      io->flush();
+
+      // lpzk polynomial proof
+      std::vector<uint8_t> ext(48);
+      io->recv_data(&ext[0], 48);
+      mpz_class chi = hex_compose(&ext[0]);
+      mpz_class powchi = chi;
+
+      std::vector<mpz_class> pi_coeff(coeff_cnt);
+      std::vector<mpz_class> A_pow(coeff_cnt);
+      std::vector<mpz_class> B_pow(coeff_cnt+1);
+      A_pow[0] = B_pow[0] = 1;
+
+      for (int i = 0; i < sz; i++)
+        for (int j = 0; j < inter_cnt; j++) {
+          // r[i * (inter_cnt + 1) + j]^coeff_cnt = r[i * (inter_cnt + 1) + j + 1]
+          mpz_class A = gmp_P - r[i * (inter_cnt + 1) + j];
+          mpz_class B = r_mac[i * (inter_cnt + 1) + j];
+          // (AX+B)^coeff_cnt
+          for (int k = 1; k < coeff_cnt; k++) A_pow[k] = (A_pow[k-1] * A) % gmp_P;            
+          for (int k = 1; k < coeff_cnt + 1; k++) B_pow[k] = (B_pow[k-1] * B) % gmp_P;
+          // compute the coefficients
+          for (int k = 0; k < coeff_cnt; k++) 
+            pi_coeff[k] = (pi_coeff[k] + powchi * B_pow[coeff_cnt-k] * A_pow[k] * zk_coeff[k]) % gmp_P;
+          pi_coeff[coeff_cnt-1] = (pi_coeff[coeff_cnt-1] + powchi * r_mac[i * (inter_cnt + 1) + j + 1]) % gmp_P;
+          powchi = (powchi * chi) % gmp_P;
+        }
+
+      // adding ZK
+      std::vector<mpz_class> otp_mac(coeff_cnt-1);
+      std::vector<mpz_class> otp(coeff_cnt-1);
+      zkvole.extend_recver(&otp_mac[0], &otp[0], coeff_cnt-1);
+      for (int i = 0; i < coeff_cnt - 1; i++) {
+        pi_coeff[i] = (pi_coeff[i] + otp_mac[i]) % gmp_P;
+        pi_coeff[i+1] = (pi_coeff[i+1] + (gmp_P - otp[i])) % gmp_P;
+      }
+
+      std::vector<uint8_t> hex_pi_coeff(coeff_cnt * 48);
+      for (int i = 0; i < coeff_cnt; i++) hex_decompose(pi_coeff[i], &hex_pi_coeff[i * 48]);
+      io->send_data(&hex_pi_coeff[0], coeff_cnt * 48);
+      io->flush();
+
+      // extract out the desireed values
+      alpha.resize(sz);
+      alpha_mac.resize(sz);
+      
+      for (int i = 0; i < sz; i++) {
+        alpha[i] = r[(i + 1) * (inter_cnt + 1) - 1];
+        alpha_mac[i] = r_mac[(i + 1) * (inter_cnt + 1) - 1];
+      }
+
+    } else {
+      std::vector<mpz_class> r_mac(sz * (inter_cnt + 1));
+      zkvole.extend_sender(&r_mac[0], sz * (inter_cnt + 1));
+
+      // commit the intermedia value
+      std::vector<uint8_t> diff(sz * inter_cnt * 48);
+      io->recv_data(&diff[0], sz * inter_cnt * 48);
+      for (int i = 0; i < sz; i++) 
+        for (int j = 0; j < inter_cnt; j++) 
+          r_mac[i * (inter_cnt + 1) + 1 + j] = (r_mac[i * (inter_cnt + 1) + 1 + j] + (gmp_P - hex_compose( &diff[ (i * inter_cnt + j) * 48 ] ) * zkDelta % gmp_P ) ) % gmp_P;
+
+      // lpzk polynomial proof
+      std::vector<uint8_t> ext(48);
+      mpz_class chi = GMP_PRG_FP().sample();
+      hex_decompose(chi, &ext[0]);
+      io->send_data(&ext[0], 48);
+      io->flush();
+      mpz_class powchi = chi;
+
+      mpz_class expect_pi = 0;
+      std::vector<mpz_class> powdelta(coeff_cnt); powdelta[0] = 1;
+      for (int i = 1; i < coeff_cnt; i++) powdelta[i] = (powdelta[i-1] * zkDelta) % gmp_P;
+      for (int i = 0; i < sz; i++)
+        for (int j = 0; j < inter_cnt; j++) {
+          // r[i * (inter_cnt + 1) + j]^coeff_cnt = r[i * (inter_cnt + 1) + j + 1]
+          mpz_class tmp_pi;
+          mpz_powm_ui(tmp_pi.get_mpz_t(), r_mac[ i * (inter_cnt + 1) + j ].get_mpz_t(), coeff_cnt, gmp_P.get_mpz_t());
+          tmp_pi = (tmp_pi + powdelta[coeff_cnt-1] * r_mac[ i * (inter_cnt + 1) + j + 1 ]) % gmp_P;
+          expect_pi = (expect_pi + tmp_pi * powchi) % gmp_P;
+          powchi = (powchi * chi) % gmp_P;
+        }
+
+      // adding zk
+      std::vector<mpz_class> otp_mac(coeff_cnt-1);
+      zkvole.extend_sender(&otp_mac[0], coeff_cnt-1);
+      for (int i = 0; i < coeff_cnt-1; i++) expect_pi = (expect_pi + otp_mac[i] * powdelta[i]) % gmp_P;
+
+      std::vector<uint8_t> hex_pi_coeff(coeff_cnt * 48);
+      io->recv_data(&hex_pi_coeff[0], coeff_cnt * 48);
+      mpz_class server_pi;
+      for (int i = 0; i < coeff_cnt; i++) server_pi = (server_pi + powdelta[i] * hex_compose(&hex_pi_coeff[i * 48])) % gmp_P;
+
+      if (server_pi != expect_pi) {
+        std::cout << "The server is cheating in the offline phase to prepare the e-th residues!" << std::endl;
+        abort();
+      }
+      std::cout << "e-th residues prepared!" << std::endl;
+
+      // extract out the desired values
+      alpha_mac.resize(sz);
+
+      for (int i = 0; i < sz; i++) 
+        alpha_mac[i] = r_mac[(i + 1) * (inter_cnt + 1) - 1];
+
+    }
+
+    cout << zkvole.ot_limit << ' ' << zkvole.ot_used << endl;
 
   }
 
@@ -223,8 +360,32 @@ public:
     return gmp_raise(msg2 * gmp_inverse(a) % gmp_P);
   }
 
+  // batch malicious
+  void oprf_batch_eval_server_malicious(const int &sz) {
+    if (cur + sz > alpha.size()) malicious_offline(sz); // TODO: we can first use-up all the leftover correlations than extend
+    std::vector<uint8_t> ext(48 * sz);
+    io->recv_data(&ext[0], 48 * sz);
+    std::vector<mpz_class> msg1(sz);
+    std::vector<mpz_class> msg2(sz);
+    for (int i = 0; i < sz; i++) {
+      msg1[i] = hex_compose(&ext[48 * i]);
+      msg2[i] = ((msg1[i] - oprf_mac[cur + i]) % gmp_P + gmp_P) % gmp_P;
+      msg2[i] = (msg2[i] * alpha[cur + i]) % gmp_P;
+      for (int j = 48 * i; j < 48 * (i+1); j++) ext[j] = 0;
+      hex_decompose(msg2[i], &ext[48 * i]);      
+    }
+    io->send_data(&ext[0], 48 * sz);
+    io->flush();
+    // TODO: add ZK to prevent malicious bahaviors
+    cur += sz;
+  }
+
   // batch eval
   void oprf_batch_eval_server(const int &sz) {
+    if (is_malicious) {
+      oprf_batch_eval_server_malicious(sz);
+      return;
+    }
     std::vector<uint8_t> ext(48 * sz);
     std::vector<mpz_class> share(sz);
     vole.extend_sender(&share[0], sz);
@@ -244,7 +405,32 @@ public:
     io->flush();
   }
 
+  void oprf_batch_eval_client_malicious(const mpz_class *x, const int &sz, std::vector<mpz_class> &y) {
+    if (cur + sz > alpha.size()) malicious_offline(sz); // TODO: we can first use-up all the leftover correlations than extend
+    std::vector<uint8_t> ext(48 * sz);
+    y.resize(sz);
+    std::vector<mpz_class> msg1(sz);
+    for (int i = 0; i < sz; i++) {
+      msg1[i] = (oprf_a[cur+i] * x[i] + oprf_mac[cur+i]) % gmp_P;
+      hex_decompose(msg1[i], &ext[48 * i]);
+    }
+    io->send_data(&ext[0], 48 * sz);
+    io->flush();
+    io->recv_data(&ext[0], 48 * sz);
+    std::vector<mpz_class> msg2(sz);
+    for (int i = 0; i < sz; i++) {
+      msg2[i] = hex_compose(&ext[48 * i]);
+      y[i] = gmp_raise(msg2[i] * gmp_inverse(oprf_a[i + cur]) % gmp_P);
+    }
+    // TODO: zkp for malicious behaviors
+    cur += sz;
+  }
+
   void oprf_batch_eval_client(const mpz_class *x, const int &sz, std::vector<mpz_class> &y) {
+    if (is_malicious) {
+      oprf_batch_eval_client_malicious(x, sz, y);
+      return;
+    }
     std::vector<uint8_t> ext(48 * sz);
     y.resize(sz);
     std::vector<mpz_class> share(sz), a(sz);

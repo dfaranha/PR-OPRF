@@ -9,8 +9,8 @@ static mpz_class gmp_F("11579208923731619542357098500868790785326998466564056403
 static mpz_class gmp_P = (gmp_F << 128) + 1;
 static mpz_class gmp_P_m2 = gmp_P - 2;
 //static mpz_class gmp_P("39402006196394479212279040100143613805079739270465446667948293404245721760140286615427945036794788117771363932962817");
-static std::vector<bool> bit_gmp_P_m2;
-static std::vector<bool> bit_gmp_F;
+// static std::vector<bool> bit_gmp_P_m2;
+// static std::vector<bool> bit_gmp_F;
 #define oprf_P_len 384
 
 void bit_decompose(mpz_class num, bool *out) {
@@ -28,12 +28,12 @@ void bit_decompose(mpz_class num, int size, std::vector<bool> &out) {
 }
 
 // the setup needs to be adjusted if P is changed
-void gmp_setup() {
-    bit_gmp_P_m2.resize(384);
-    bit_decompose(gmp_P_m2, 384, bit_gmp_P_m2);
-    bit_gmp_F.resize(256);
-    bit_decompose(gmp_F, 256, bit_gmp_F);
-}
+// void gmp_setup() {
+//     bit_gmp_P_m2.resize(384);
+//     bit_decompose(gmp_P_m2, 384, bit_gmp_P_m2);
+//     bit_gmp_F.resize(256);
+//     bit_decompose(gmp_F, 256, bit_gmp_F);
+// }
 
 static mpz_class minorone("-1");
 
@@ -59,6 +59,24 @@ mpz_class gmp_raise(const mpz_class &in) {
     //     sq = sq * sq % gmp_P;
     // }
     return res;
+}
+
+
+static std::vector<mpz_class> zk_coeff;
+
+void generate_coeff(int epsilon) {
+    int coeff_cnt = 1 << epsilon;
+    auto start = clock_start();
+    zk_coeff.resize(coeff_cnt+1);
+    //std::vector<mpz_class> coeff(coeff_cnt+1);
+    mpz_class acc_up = 1;
+    mpz_class acc_down = 1;
+    for (int i = 0; i <= coeff_cnt; i++) {
+      zk_coeff[i] = acc_up * gmp_inverse(acc_down) % gmp_P;
+      acc_up = acc_up * (coeff_cnt-i) % gmp_P;
+      acc_down = acc_down * (i+1) % gmp_P;
+    }
+    cout << "Preparing zk coeffients require " << time_from(start) << " us" << endl;
 }
 
 mpz_class bit_compose(bool *in) {

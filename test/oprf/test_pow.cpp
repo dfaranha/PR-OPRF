@@ -14,7 +14,7 @@ int port, party;
 const int threads = 1;
 
 int main(int argc, char **argv) {
-  gmp_setup();
+  //gmp_setup();
   auto start = clock_start();
   for (int i = 0; i < 1000000; i++) {
     mpz_class x = gmp_P - 10;
