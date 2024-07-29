@@ -22,12 +22,12 @@ int main(int argc, char **argv) {
         party == ALICE);
 
   std::cout << std::endl
-            << "------------ TEST SEMI-HONEST OPRF ------------"
+            << "------------ TEST MALICIOUS OPRF ------------"
             << std::endl
             << std::endl;
 
   // cout << "#VOLE: "; int test_nn = 10005354;
-  int test_nn = 10005354;
+  int test_nn = 1000; //5354;
 
   uint64_t com1, com11;
   com1 = comm(ios);
@@ -43,6 +43,8 @@ int main(int argc, char **argv) {
     auto start = clock_start();
 
     oprf.setup(delta); 
+    oprf.setup_malicious(); 
+    oprf.malicious_offline(100);
     //oprf.oprf_eval_server();   
     oprf.oprf_batch_eval_server(test_nn);
 
@@ -64,6 +66,8 @@ int main(int argc, char **argv) {
     auto start = clock_start();
 
     oprf.setup();
+    oprf.setup_malicious(); 
+    oprf.malicious_offline(100);
     std::vector<mpz_class> in(test_nn);
     for (int i = 0; i < test_nn; i++) in[i] = i;
     std::vector<mpz_class> out(test_nn);
