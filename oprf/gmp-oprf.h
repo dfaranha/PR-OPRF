@@ -377,6 +377,26 @@ public:
     io->send_data(&ext[0], 48 * sz);
     io->flush();
     // TODO: add ZK to prevent malicious bahaviors
+    io->recv_data(&ext[0], 48);
+    mpz_class chi = hex_compose(&ext[0]);
+    mpz_class powchi = 1;
+    mpz_class C1, C0; // two coefficients as the proof
+    for (int i = 0; i < sz; i++) {
+      int now = cur + i;
+      C1 = (C1 + powchi * (msg1[i] + gmp_P - oprf_mac[now]) * alpha_mac[now] + powchi * (gmp_P - alpha[now]) * zk_mac[now] ) % gmp_P;
+      C0 = (C0 + powchi * zk_mac[now] * alpha_mac[now]) % gmp_P;
+      powchi = (powchi * chi) % gmp_P;
+    }
+    // final zk padding
+    mpz_class pad1, pad0;
+    zkvole.extend_recver(&pad0, &pad1, 1);
+    C1 = (C1 + gmp_P - pad1) % gmp_P;
+    C0 = (C0 + pad0) % gmp_P;
+    std::vector<uint8_t> hex_pi(96);
+    hex_decompose(C1, &hex_pi[0]);
+    hex_decompose(C0, &hex_pi[48]);
+    io->send_data(&hex_pi[0], 96);
+    io->flush();
     cur += sz;
   }
 
@@ -417,12 +437,42 @@ public:
     io->send_data(&ext[0], 48 * sz);
     io->flush();
     io->recv_data(&ext[0], 48 * sz);
+    // send the random challenge after committing
+    mpz_class chi = GMP_PRG_FP().sample();
+    std::vector<uint8_t> hex_chi(48);
+    hex_decompose(chi, &hex_chi[0]);
+    io->send_data(&hex_chi[0], 48);
+    io->flush();
+
     std::vector<mpz_class> msg2(sz);
     for (int i = 0; i < sz; i++) {
       msg2[i] = hex_compose(&ext[48 * i]);
       y[i] = gmp_raise(msg2[i] * gmp_inverse(oprf_a[i + cur]) % gmp_P);
     }
     // TODO: zkp for malicious behaviors
+
+    mpz_class sq_zk_delta = zkDelta * zkDelta % gmp_P;
+    mpz_class powchi = 1;
+    mpz_class expect_pi = 0;
+    for (int i = 0; i < sz; i++) {
+      int now = cur + i;
+      expect_pi = (expect_pi + powchi * ((zk_mac[now] + msg1[i] * zkDelta) * alpha_mac[now] + msg2[i] * sq_zk_delta)) % gmp_P;
+      powchi = powchi * chi % gmp_P;
+    }
+    mpz_class pad;
+    zkvole.extend_sender(&pad, 1);
+    expect_pi = (expect_pi + pad) % gmp_P;
+    //cout << expect_pi << endl;
+    std::vector<uint8_t> hex_pi(96);
+    io->recv_data(&hex_pi[0], 96);
+    mpz_class C1 = hex_compose(&hex_pi[0]);
+    mpz_class C0 = hex_compose(&hex_pi[48]);
+    //cout << (C1 * zkDelta + C0) % gmp_P << endl;
+    if ((C1 * zkDelta + C0) % gmp_P != expect_pi) {
+      cout << "The server is cheating in the final opening!" << endl;
+      abort();
+    }
+    cout << "opening check pass" << endl;
     cur += sz;
   }
 

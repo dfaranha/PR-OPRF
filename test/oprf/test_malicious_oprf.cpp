@@ -27,7 +27,7 @@ int main(int argc, char **argv) {
             << std::endl;
 
   // cout << "#VOLE: "; int test_nn = 10005354;
-  int test_nn = 100000; //5354;
+  int test_nn = 290000; //5354;
 
   uint64_t com1, com11;
   com1 = comm(ios);
