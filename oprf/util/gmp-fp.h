@@ -1,9 +1,13 @@
 #ifndef GMP_FP
 #define GMP_FP
 
+#include "emp-tool/emp-tool.h"
 #include <gmpxx.h>
 #include <vector>
 #include <string>
+
+using namespace std;
+using namespace emp;
 
 static mpz_class gmp_F("115792089237316195423570985008687907853269984665640564039457584007913129606561");
 static mpz_class gmp_P = (gmp_F << 128) + 1;
