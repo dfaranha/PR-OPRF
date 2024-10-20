@@ -52,7 +52,7 @@ int main(int argc, char **argv) {
     std::cout << "communication (B): " << com2 << std::endl;
     std::cout << "communication (B): " << com22 << std::endl;
     std::cout << "comm. libOT (B): " << sock.bytesReceived()+sock.bytesSent() << std::endl;
-    std::cout << v[0] << ' ' << delta << std::endl;
+    //std::cout << v[0] << ' ' << delta << std::endl;
     cope.check_triple(v, v, 50000);
   } else {
     OprfCope<BoolIO<NetIO>> cope(party, ios[0], oprf_P_len);
@@ -70,7 +70,7 @@ int main(int argc, char **argv) {
     std::cout << "communication (B): " << com2 << std::endl;
     std::cout << "communication (B): " << com22 << std::endl;
     std::cout << "comm. libOT (B): " << sock.bytesReceived()+sock.bytesSent() << std::endl;
-    std::cout << u[0] << ' ' << w[0] << std::endl;
+    //std::cout << u[0] << ' ' << w[0] << std::endl;
     cope.check_triple(u, w, 50000);
   }
 

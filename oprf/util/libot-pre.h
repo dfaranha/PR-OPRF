@@ -59,7 +59,42 @@ void preot_sender(size_t numOTs, std::span<std::array<osuCrypto::block, 2>> sMsg
         // OT extension
         coproto::sync_wait(sender.send(sMsgs, prng, sock));
         coproto::sync_wait(sock.flush());
-    }    
+    }
+    // } else if (is_malicious == false && is_pq == true) {
+    //     osuCrypto::SoftSpokenShOtSender<> sender;
+    //     osuCrypto::MasnyRindalKyber bot;
+    //     osuCrypto::PRNG prng(osuCrypto::sysRandomSeed());
+
+    //     // setup base OTs
+    //     osuCrypto::u64 baseOTs = sender.baseOtCount();
+    //     std::vector<osuCrypto::block> rMsgBase(baseOTs);
+    //     osuCrypto::BitVector choices(baseOTs);
+    //     choices.randomize(prng);
+    //     coproto::sync_wait(bot.receive(choices, rMsgBase, prng, sock));
+    //     coproto::sync_wait(sock.flush());
+    //     sender.setBaseOts(rMsgBase, choices);
+
+    //     // OT extension
+    //     coproto::sync_wait(sender.send(sMsgs, prng, sock));
+    //     coproto::sync_wait(sock.flush());        
+    // } else {
+    //     osuCrypto::SoftSpokenMalOtSender sender;
+    //     osuCrypto::MasnyRindalKyber bot;
+    //     osuCrypto::PRNG prng(osuCrypto::sysRandomSeed());
+
+    //     // setup base OTs
+    //     osuCrypto::u64 baseOTs = sender.baseOtCount();
+    //     std::vector<osuCrypto::block> rMsgBase(baseOTs);
+    //     osuCrypto::BitVector choices(baseOTs);
+    //     choices.randomize(prng);
+    //     coproto::sync_wait(bot.receive(choices, rMsgBase, prng, sock));
+    //     coproto::sync_wait(sock.flush());
+    //     sender.setBaseOts(rMsgBase, choices);
+
+    //     // OT extension
+    //     coproto::sync_wait(sender.send(sMsgs, prng, sock));
+    //     coproto::sync_wait(sock.flush());        
+    // } 
 }
 
 void preot_receiver(size_t numOTs, osuCrypto::BitVector &choices, std::span<osuCrypto::block> rMsgs, osuCrypto::Socket& sock) {
@@ -94,8 +129,41 @@ void preot_receiver(size_t numOTs, osuCrypto::BitVector &choices, std::span<osuC
         // OT extension
         choices.randomize(prng);
         coproto::sync_wait(receiver.receive(choices, rMsgs, prng, sock));
-        coproto::sync_wait(sock.flush());        
-    }
+        coproto::sync_wait(sock.flush());   
+    }     
+    // } else if (is_malicious == false && is_pq == true) {
+    //     osuCrypto::SoftSpokenShOtReceiver<> receiver;
+    //     osuCrypto::MasnyRindalKyber bot;
+    //     osuCrypto::PRNG prng(osuCrypto::sysRandomSeed());
+
+    //     // setup base OTs
+    //     osuCrypto::u64 baseOTs = receiver.baseOtCount();
+    //     std::vector<std::array<osuCrypto::block, 2>> sMsgBase(baseOTs);
+    //     coproto::sync_wait(bot.send(sMsgBase, prng, sock));
+    //     coproto::sync_wait(sock.flush());
+    //     receiver.setBaseOts(sMsgBase);
+
+    //     // OT extension
+    //     choices.randomize(prng);
+    //     coproto::sync_wait(receiver.receive(choices, rMsgs, prng, sock));
+    //     coproto::sync_wait(sock.flush());     
+    // } else {
+    //     osuCrypto::SoftSpokenMalOtReceiver receiver;
+    //     osuCrypto::MasnyRindalKyber bot;
+    //     osuCrypto::PRNG prng(osuCrypto::sysRandomSeed());
+
+    //     // setup base OTs
+    //     osuCrypto::u64 baseOTs = receiver.baseOtCount();
+    //     std::vector<std::array<osuCrypto::block, 2>> sMsgBase(baseOTs);
+    //     coproto::sync_wait(bot.send(sMsgBase, prng, sock));
+    //     coproto::sync_wait(sock.flush());
+    //     receiver.setBaseOts(sMsgBase);
+
+    //     // OT extension
+    //     choices.randomize(prng);
+    //     coproto::sync_wait(receiver.receive(choices, rMsgs, prng, sock));
+    //     coproto::sync_wait(sock.flush());     
+    // }
 }
 
 };

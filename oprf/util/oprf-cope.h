@@ -26,7 +26,7 @@ public:
     this->io = io;
   }
 
-  // sender
+  // sender_LIBOT
   void initialize(mpz_class &delta, osuCrypto::Socket &sock) {
 
     osuCrypto::BitVector choices(oprf_P_len);
@@ -54,21 +54,26 @@ public:
       memcpy(&tmpbl, &rMsgs[i], sizeof(block));
       G0[i].reseed(&tmpbl);
     }
-
-    // old codes using EMP::OT
-    // this->delta = delta;
-    // delta384_to_bool();
-
-    // std::vector<block> K(m);
-    // OTCO<IO> otco(io);
-
-    // otco.recv(&K[0], delta_bool.get(), m);
-    // G0.resize(m);
-    // for (int i = 0; i < m; ++i)
-    //   G0[i].reseed(&K[i]);
+    
   }
 
-  // recver
+  // sender_EMPOT
+  void initialize(const mpz_class &delta) {
+
+    this->delta = delta;
+    delta384_to_bool();
+
+    std::vector<block> K(m);
+    OTCO<IO> otco(io);
+
+    otco.recv(&K[0], delta_bool.get(), m);
+    G0.resize(m);
+    for (int i = 0; i < m; ++i)
+      G0[i].reseed(&K[i]);
+
+  }  
+
+  // recver_LIBOT
   void initialize(osuCrypto::Socket &sock) {
 
     std::vector<std::array<osuCrypto::block, 2>> sMsgs(oprf_P_len);
@@ -83,19 +88,24 @@ public:
       G1[i].reseed(&tmpbl);
     }
 
-    // old codes using EMP::OT
-    // std::vector<block> K(2 * m);
-    // PRG prg;
-    // prg.random_block(&K[0], 2 * m);
-    // OTCO<IO> otco(io);
-    // otco.send(&K[0], &K[m], m);
+  }
+  
+  // recver_EMPOT
+  void initialize() {
 
-    // G0.resize(m);
-    // G1.resize(m);
-    // for (int i = 0; i < m; ++i) {
-    //   G0[i].reseed(&K[i]);
-    //   G1[i].reseed(&K[m + i]);
-    // }
+    std::vector<block> K(2 * m);
+    PRG prg;
+    prg.random_block(&K[0], 2 * m);
+    OTCO<IO> otco(io);
+    otco.send(&K[0], &K[m], m);
+
+    G0.resize(m);
+    G1.resize(m);
+    for (int i = 0; i < m; ++i) {
+      G0[i].reseed(&K[i]);
+      G1[i].reseed(&K[m + i]);
+    }
+
   }
 
   // sender

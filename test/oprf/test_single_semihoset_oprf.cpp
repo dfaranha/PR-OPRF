@@ -18,8 +18,15 @@ int main(int argc, char **argv) {
   BoolIO<NetIO> *ios[threads];
   for (int i = 0; i < threads; ++i)
     ios[i] = new BoolIO<NetIO>(
-        new NetIO(party == ALICE ? nullptr : argv[3], port + i),
+        new NetIO(party == ALICE ? nullptr : argv[3], port + i + 1),
         party == ALICE);
+
+  osuCrypto::Socket sock;
+  if (party == ALICE) {
+    sock = osuCrypto::cp::asioConnect("127.0.0.1:"+string(argv[2]), true);
+  } else {
+    sock = osuCrypto::cp::asioConnect(string(argv[3])+":"+string(argv[2]), false);
+  }     
 
   std::cout << std::endl
             << "------------ TEST SEMI-HONEST OPRF ------------"
@@ -36,9 +43,9 @@ int main(int argc, char **argv) {
   // tmptmp
   if (party == ALICE) {
     GMP_PRG_FP prgdelta;
-    mpz_class delta = prgdelta.sample();
+    mpz_class delta; // = prgdelta.sample();
 
-    OprfBaseVole<BoolIO<NetIO>> basevole(party, ios[0], delta);
+    OprfBaseVole<BoolIO<NetIO>> basevole(party, ios[0], delta, sock);
 
     std::vector<mpz_class> v(1);
     auto start = clock_start();
@@ -64,8 +71,9 @@ int main(int argc, char **argv) {
     uint64_t com22 = comm2(ios) - com11;
     std::cout << "communication (B): " << com2 << std::endl;
     std::cout << "communication (B): " << com22 << std::endl;
+    std::cout << "comm. libOT (B): " << sock.bytesReceived()+sock.bytesSent() << std::endl;    
   } else {
-    OprfBaseVole<BoolIO<NetIO>> basevole(party, ios[0]);
+    OprfBaseVole<BoolIO<NetIO>> basevole(party, ios[0], sock);
 
     std::vector<mpz_class> u(1);
     std::vector<mpz_class> w(1);
@@ -89,6 +97,7 @@ int main(int argc, char **argv) {
     uint64_t com22 = comm2(ios) - com11;
     std::cout << "communication (B): " << com2 << std::endl;
     std::cout << "communication (B): " << com22 << std::endl;
+    std::cout << "comm. libOT (B): " << sock.bytesReceived()+sock.bytesSent() << std::endl;    
   }
 
 

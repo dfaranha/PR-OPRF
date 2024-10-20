@@ -20,11 +20,26 @@ public:
     cope.initialize(Delta);
   }
 
+  // SENDER_LIBOT
+  OprfBaseVole(int party, IO *io, mpz_class &Delta, osuCrypto::Socket &sock) : cope(party, io, oprf_P_len) {
+    this->party = party;
+    this->io = io;
+    cope.initialize(Delta, sock);    
+    this->Delta = Delta;
+  }  
+
   // RECEIVER
   OprfBaseVole(int party, IO *io) : cope(party, io, oprf_P_len) {
     this->party = party;
     this->io = io;
     cope.initialize();
+  }
+
+  // RECEIVER_LIBOT
+  OprfBaseVole(int party, IO *io, osuCrypto::Socket &sock) : cope(party, io, oprf_P_len) {
+    this->party = party;
+    this->io = io;
+    cope.initialize(sock);
   }
 
   // sender
