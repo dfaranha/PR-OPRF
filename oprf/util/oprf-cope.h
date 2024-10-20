@@ -5,7 +5,9 @@
 #include "emp-tool/emp-tool.h"
 #include "emp-zk/emp-vole/utility.h"
 #include "oprf/util/gmp-prg-fp.h"
+#include "oprf/util/libot-pre.h"
 #include <vector>
+#include <array>
 
 template <typename IO> class OprfCope {
 public:
@@ -24,34 +26,76 @@ public:
     this->io = io;
   }
 
-  // sendern
-  void initialize(const mpz_class &delta) {
+  // sender
+  void initialize(mpz_class &delta, osuCrypto::Socket &sock) {
+
+    osuCrypto::BitVector choices(oprf_P_len);
+    std::vector<osuCrypto::block> rMsgs(oprf_P_len);
+    libotpre::preot_receiver(oprf_P_len, choices, rMsgs, sock);
+
+    // to be optimized; todo
+    string res = "";
+    for (int i = 0; i < oprf_P_len; i++) {
+      if (choices[i]) {
+        delta_bool[i] = 1;
+        res = "1" + res;
+      } else {
+        delta_bool[i] = 0;
+        res = "0" + res;
+      }
+    }
+
+    delta.set_str(res.c_str(), 2);
     this->delta = delta;
-    delta384_to_bool();
 
-    std::vector<block> K(m);
-    OTCO<IO> otco(io);
-
-    otco.recv(&K[0], delta_bool.get(), m);
     G0.resize(m);
-    for (int i = 0; i < m; ++i)
-      G0[i].reseed(&K[i]);
+    for (int i = 0; i < m; ++i) {
+      block tmpbl;
+      memcpy(&tmpbl, &rMsgs[i], sizeof(block));
+      G0[i].reseed(&tmpbl);
+    }
+
+    // old codes using EMP::OT
+    // this->delta = delta;
+    // delta384_to_bool();
+
+    // std::vector<block> K(m);
+    // OTCO<IO> otco(io);
+
+    // otco.recv(&K[0], delta_bool.get(), m);
+    // G0.resize(m);
+    // for (int i = 0; i < m; ++i)
+    //   G0[i].reseed(&K[i]);
   }
 
   // recver
-  void initialize() {
-    std::vector<block> K(2 * m);
-    PRG prg;
-    prg.random_block(&K[0], 2 * m);
-    OTCO<IO> otco(io);
-    otco.send(&K[0], &K[m], m);
+  void initialize(osuCrypto::Socket &sock) {
 
-    G0.resize(m);
-    G1.resize(m);
-    for (int i = 0; i < m; ++i) {
-      G0[i].reseed(&K[i]);
-      G1[i].reseed(&K[m + i]);
+    std::vector<std::array<osuCrypto::block, 2>> sMsgs(oprf_P_len);
+    libotpre::preot_sender(oprf_P_len, sMsgs, sock);
+
+    G0.resize(m); G1.resize(m);
+    for (int i = 0; i < m; i++) {
+      block tmpbl;
+      memcpy(&tmpbl, &sMsgs[i][0], sizeof(block));
+      G0[i].reseed(&tmpbl);
+      memcpy(&tmpbl, &sMsgs[i][1], sizeof(block));
+      G1[i].reseed(&tmpbl);
     }
+
+    // old codes using EMP::OT
+    // std::vector<block> K(2 * m);
+    // PRG prg;
+    // prg.random_block(&K[0], 2 * m);
+    // OTCO<IO> otco(io);
+    // otco.send(&K[0], &K[m], m);
+
+    // G0.resize(m);
+    // G1.resize(m);
+    // for (int i = 0; i < m; ++i) {
+    //   G0[i].reseed(&K[i]);
+    //   G1[i].reseed(&K[m + i]);
+    // }
   }
 
   // sender

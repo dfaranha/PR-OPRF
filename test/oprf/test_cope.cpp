@@ -17,8 +17,15 @@ int main(int argc, char **argv) {
   BoolIO<NetIO> *ios[threads];
   for (int i = 0; i < threads; ++i)
     ios[i] = new BoolIO<NetIO>(
-        new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + i),
+        new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + i + 1),
         party == ALICE);
+
+  osuCrypto::Socket sock;
+  if (party == ALICE) {
+    sock = osuCrypto::cp::asioConnect("127.0.0.1:"+string(argv[2]), true);
+  } else {
+    sock = osuCrypto::cp::asioConnect("127.0.0.1:"+string(argv[2]), false);
+  }
 
   std::cout << std::endl
             << "------------ TEST COPE ------------"
@@ -32,9 +39,9 @@ int main(int argc, char **argv) {
   // tmptmp
   if (party == ALICE) {
     GMP_PRG_FP prgdelta;
-    mpz_class delta = prgdelta.sample();
+    mpz_class delta; // = prgdelta.sample();
     OprfCope<BoolIO<NetIO>> cope(party, ios[0], oprf_P_len);
-    cope.initialize(delta);
+    cope.initialize(delta, sock);
     std::vector<mpz_class> v(50000);
     auto start = clock_start();
     cope.extend(v, 50000);
@@ -44,10 +51,12 @@ int main(int argc, char **argv) {
     uint64_t com22 = comm2(ios) - com11;
     std::cout << "communication (B): " << com2 << std::endl;
     std::cout << "communication (B): " << com22 << std::endl;
+    std::cout << "comm. libOT (B): " << sock.bytesReceived()+sock.bytesSent() << std::endl;
+    std::cout << v[0] << ' ' << delta << std::endl;
     cope.check_triple(v, v, 50000);
   } else {
     OprfCope<BoolIO<NetIO>> cope(party, ios[0], oprf_P_len);
-    cope.initialize();  
+    cope.initialize(sock);  
     GMP_PRG_FP prg;
     std::vector<mpz_class> u(50000);
     std::vector<mpz_class> w(50000);
@@ -60,6 +69,8 @@ int main(int argc, char **argv) {
     uint64_t com22 = comm2(ios) - com11;
     std::cout << "communication (B): " << com2 << std::endl;
     std::cout << "communication (B): " << com22 << std::endl;
+    std::cout << "comm. libOT (B): " << sock.bytesReceived()+sock.bytesSent() << std::endl;
+    std::cout << u[0] << ' ' << w[0] << std::endl;
     cope.check_triple(u, w, 50000);
   }
 
