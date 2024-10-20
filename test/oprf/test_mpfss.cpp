@@ -9,6 +9,7 @@
 using namespace emp;
 using namespace std;
 
+
 int port, party;
 const int threads = 1;
 
@@ -17,8 +18,15 @@ int main(int argc, char **argv) {
   BoolIO<NetIO> *ios[threads];
   for (int i = 0; i < threads; ++i)
     ios[i] = new BoolIO<NetIO>(
-        new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + i),
+        new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + i + 1),
         party == ALICE);
+
+  osuCrypto::Socket sock;
+  if (party == ALICE) {
+    sock = osuCrypto::cp::asioConnect("127.0.0.1:"+string(argv[2]), true);
+  } else {
+    sock = osuCrypto::cp::asioConnect(string(argv[3])+":"+string(argv[2]), false);
+  }     
 
   std::cout << std::endl
             << "------------ TEST MPFSS ------------"
@@ -40,18 +48,20 @@ int main(int argc, char **argv) {
     std::vector<mpz_class> last(total_n);
 
     GMP_PRG_FP prgdelta;
-    mpz_class delta = prgdelta.sample();
+    mpz_class delta; // = prgdelta.sample();
 
-    OprfBaseVole<BoolIO<NetIO>> basevole(party, ios[0], delta);
+    OprfBaseVole<BoolIO<NetIO>> basevole(party, ios[0], delta, sock);
     OprfMpfssRegFp<BoolIO<NetIO>> mpfss(party, threads, total_n, t, h, pool, ios);
     mpfss.set_malicious();
-    BaseCot<BoolIO<NetIO>> cot(party, ios[0], true);
-    cot.cot_gen_pre();
+    //BaseCot<BoolIO<NetIO>> cot(party, ios[0], true);
+    //cot.cot_gen_pre();
 
     auto start = clock_start();
 
-    OTPre<BoolIO<NetIO>> *pre_ot = new OTPre<BoolIO<NetIO>>(ios[0], h, t);
-    cot.cot_gen(pre_ot, pre_ot->n);
+    LibOTPre<BoolIO<NetIO>> *pre_ot = new LibOTPre<BoolIO<NetIO>>(ios[0], h, t);
+    pre_ot->send_gen_pre(sock);
+    pre_ot->send_gen(sock);
+    //cot.cot_gen(pre_ot, pre_ot->n);
 
     std::vector<mpz_class> v(t+1);
     basevole.triple_gen_send(v, t+1);
@@ -67,6 +77,7 @@ int main(int argc, char **argv) {
     uint64_t com22 = comm2(ios) - com11;
     std::cout << "communication (B): " << com2 << std::endl;
     std::cout << "communication (B): " << com22 << std::endl;
+    std::cout << "comm. libOT (B): " << sock.bytesReceived()+sock.bytesSent() << std::endl; 
 
     mpfss.check_correctness_sender(ios[0]);
 
@@ -76,16 +87,18 @@ int main(int argc, char **argv) {
     ThreadPool* pool = new ThreadPool(threads);
     std::vector<mpz_class> last(total_n);    
 
-    OprfBaseVole<BoolIO<NetIO>> basevole(party, ios[0]);
+    OprfBaseVole<BoolIO<NetIO>> basevole(party, ios[0], sock);
     OprfMpfssRegFp<BoolIO<NetIO>> mpfss(party, threads, total_n, t, h, pool, ios);
     mpfss.set_malicious();
-    BaseCot<BoolIO<NetIO>> cot(party, ios[0], true);
-    cot.cot_gen_pre();
+    //BaseCot<BoolIO<NetIO>> cot(party, ios[0], true);
+    //cot.cot_gen_pre();
     
     auto start = clock_start();
 
-    OTPre<BoolIO<NetIO>> *pre_ot = new OTPre<BoolIO<NetIO>>(ios[0], h, t);
-    cot.cot_gen(pre_ot, pre_ot->n);
+    LibOTPre<BoolIO<NetIO>> *pre_ot = new LibOTPre<BoolIO<NetIO>>(ios[0], h, t);
+    pre_ot->recv_gen_pre(sock);
+    pre_ot->recv_gen(sock);
+    //cot.cot_gen(pre_ot, pre_ot->n);
 
     std::vector<mpz_class> w(t+1);
     std::vector<mpz_class> u(t+1);    
@@ -102,6 +115,7 @@ int main(int argc, char **argv) {
     uint64_t com22 = comm2(ios) - com11;
     std::cout << "communication (B): " << com2 << std::endl;
     std::cout << "communication (B): " << com22 << std::endl;
+    std::cout << "comm. libOT (B): " << sock.bytesReceived()+sock.bytesSent() << std::endl; 
 
     mpfss.check_correctness_recver(ios[0], &u[0]);
 
