@@ -49,30 +49,29 @@ int main(int argc, char **argv) {
     auto sock = osuCrypto::cp::asioConnect("127.0.0.1:12345", true); 
     // osuCrypto::SoftSpokenShOtReceiver extreceiver;
     // osuCrypto::SimplestOT xxx;
-    // osuCrypto::SoftSpokenMalOtReceiver extreceiver;
-    // osuCrypto::MasnyRindal xxx;
+    osuCrypto::SoftSpokenMalOtReceiver extreceiver;
+    osuCrypto::MasnyRindal xxx;
     
-    //osuCrypto::setThreadName("Sender");
-    // osuCrypto::PRNG prng(osuCrypto::sysRandomSeed());
+    osuCrypto::PRNG prng(osuCrypto::sysRandomSeed());
 
-    // osuCrypto::u64 numOTs = extreceiver.baseOtCount();
-    // std::vector<std::array<osuCrypto::block, 2>> sendMsg(numOTs);
+    osuCrypto::u64 numOTs = extreceiver.baseOtCount();
+    std::vector<std::array<osuCrypto::block, 2>> sendMsg(numOTs);
 
-    // auto p0 = xxx.send(sendMsg, prng, sock);
-    // coproto::sync_wait(p0);
-    // coproto::sync_wait(sock.flush());
+    auto p0 = xxx.send(sendMsg, prng, sock);
+    coproto::sync_wait(p0);
+    coproto::sync_wait(sock.flush());
 
-    // extreceiver.setBaseOts(sendMsg);
-    // std::cout << "comm: " << sock.bytesReceived()+sock.bytesSent() << std::endl;
+    extreceiver.setBaseOts(sendMsg);
+    std::cout << "comm: " << sock.bytesReceived()+sock.bytesSent() << std::endl;
 
     int extotnum = 384;
     osuCrypto::BitVector extchoices(extotnum);
-    // extchoices.randomize(prng);
+    extchoices.randomize(prng);
     osuCrypto::AlignedUnVector<osuCrypto::block> rMsgs(extotnum);
-    // coproto::sync_wait(extreceiver.receive(extchoices, rMsgs, prng, sock));
-    // coproto::sync_wait(sock.flush());
+    coproto::sync_wait(extreceiver.receive(extchoices, rMsgs, prng, sock));
+    coproto::sync_wait(sock.flush());
 
-    libotpre::preot_receiver(extotnum, extchoices, rMsgs, sock);
+    // libotpre::preot_receiver(extotnum, extchoices, rMsgs, sock);
 
     for (int i = 0; i < 10; i++) {      
       std::cout << i << ':' << std::endl;
@@ -81,36 +80,61 @@ int main(int argc, char **argv) {
 
     std::cout << "comm: " << sock.bytesReceived()+sock.bytesSent() << std::endl;
 
+    // libotpre::preot_receiver(extotnum, extchoices, rMsgs, sock);
+
+    extchoices.randomize(prng);
+    coproto::sync_wait(extreceiver.receive(extchoices, rMsgs, prng, sock));
+    coproto::sync_wait(sock.flush());
+
+    for (int i = 0; i < 10; i++) {      
+      std::cout << i << ':' << std::endl;
+      std::cout << extchoices[i] << ' ' << rMsgs[i] << std::endl;
+    }    
+
+    std::cout << "comm: " << sock.bytesReceived()+sock.bytesSent() << std::endl;    
+
+    extchoices.randomize(prng);
+    coproto::sync_wait(extreceiver.receive(extchoices, rMsgs, prng, sock));
+    coproto::sync_wait(sock.flush());
+
+    for (int i = 0; i < 10; i++) {      
+      std::cout << i << ':' << std::endl;
+      std::cout << extchoices[i] << ' ' << rMsgs[i] << std::endl;
+    }    
+
+    std::cout << "comm: " << sock.bytesReceived()+sock.bytesSent() << std::endl;   
+
   } else {
 
     auto sock = osuCrypto::cp::asioConnect("127.0.0.1:12345", false);
     // osuCrypto::SoftSpokenShOtSender extsender;
     // osuCrypto::SimplestOT xxx;
-    //osuCrypto::SoftSpokenMalOtSender extsender;
-    //osuCrypto::MasnyRindal xxx;
+    osuCrypto::SoftSpokenMalOtSender extsender;
+    osuCrypto::MasnyRindal xxx;
     
 
-    //osuCrypto::setThreadName("Sender");
-    // osuCrypto::PRNG prng(osuCrypto::sysRandomSeed());
+    osuCrypto::PRNG prng(osuCrypto::sysRandomSeed());
 
-    // osuCrypto::u64 numOTs = extsender.baseOtCount();
-    // std::vector<osuCrypto::block> recvMsg(numOTs);
-    // osuCrypto::BitVector choices(numOTs);
-    // choices.randomize(prng);
+    osuCrypto::u64 numOTs = extsender.baseOtCount();
+    std::vector<osuCrypto::block> recvMsg(numOTs);
+    osuCrypto::BitVector choices(numOTs);
+    choices.randomize(prng);
 
-    // auto p1 = xxx.receive(choices, recvMsg, prng, sock);
-    // coproto::sync_wait(p1);
-    // coproto::sync_wait(sock.flush());
+    auto p1 = xxx.receive(choices, recvMsg, prng, sock);
+    coproto::sync_wait(p1);
+    coproto::sync_wait(sock.flush());
 
-    // extsender.setBaseOts(recvMsg, choices);
-    // std::cout << "comm: " << sock.bytesReceived()+sock.bytesSent() << std::endl;
+    extsender.setBaseOts(recvMsg, choices);
+    std::cout << "comm: " << sock.bytesReceived()+sock.bytesSent() << std::endl;
 
     int extotnum = 384;
     osuCrypto::AlignedUnVector<std::array<osuCrypto::block, 2>> sMsgs(extotnum);
-    // coproto::sync_wait(extsender.send(sMsgs, prng, sock));
-    // coproto::sync_wait(sock.flush());
+    coproto::sync_wait(extsender.send(sMsgs, prng, sock));
+    coproto::sync_wait(sock.flush());
 
-    libotpre::preot_sender(extotnum, sMsgs, sock);
+    // std::cout << "comm: " << sock.bytesReceived()+sock.bytesSent() << std::endl;
+
+    // libotpre::preot_sender(extotnum, sMsgs, sock);
 
 
     for (int i = 0; i < 10; i++) {
@@ -121,6 +145,36 @@ int main(int argc, char **argv) {
 
 
     std::cout << "comm: " << sock.bytesReceived()+sock.bytesSent() << std::endl;
+
+    coproto::sync_wait(extsender.send(sMsgs, prng, sock));
+    coproto::sync_wait(sock.flush());    
+
+    // libotpre::preot_sender(extotnum, sMsgs, sock);
+
+
+    for (int i = 0; i < 10; i++) {
+      std::cout << i << ':' << std::endl;
+      std::cout << sMsgs[i][0] << std::endl << sMsgs[i][1] << std::endl;
+    }
+
+
+
+    std::cout << "comm: " << sock.bytesReceived()+sock.bytesSent() << std::endl;    
+
+    coproto::sync_wait(extsender.send(sMsgs, prng, sock));
+    coproto::sync_wait(sock.flush());    
+
+    // libotpre::preot_sender(extotnum, sMsgs, sock);
+
+
+    for (int i = 0; i < 10; i++) {
+      std::cout << i << ':' << std::endl;
+      std::cout << sMsgs[i][0] << std::endl << sMsgs[i][1] << std::endl;
+    }
+
+
+
+    std::cout << "comm: " << sock.bytesReceived()+sock.bytesSent() << std::endl;    
 
   }
 
