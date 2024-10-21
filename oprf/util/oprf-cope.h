@@ -30,7 +30,7 @@ public:
   void initialize(mpz_class &delta, osuCrypto::Socket &sock) {
 
     osuCrypto::BitVector choices(oprf_P_len);
-    std::vector<osuCrypto::block> rMsgs(oprf_P_len);
+    osuCrypto::AlignedUnVector<osuCrypto::block> rMsgs(oprf_P_len);
     libotpre::preot_receiver(oprf_P_len, choices, rMsgs, sock);
 
     // to be optimized; todo
@@ -76,7 +76,7 @@ public:
   // recver_LIBOT
   void initialize(osuCrypto::Socket &sock) {
 
-    std::vector<std::array<osuCrypto::block, 2>> sMsgs(oprf_P_len);
+    osuCrypto::AlignedUnVector<std::array<osuCrypto::block, 2>> sMsgs(oprf_P_len);
     libotpre::preot_sender(oprf_P_len, sMsgs, sock);
 
     G0.resize(m); G1.resize(m);
