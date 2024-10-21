@@ -18,15 +18,22 @@ int main(int argc, char **argv) {
   BoolIO<NetIO> *ios[threads];
   for (int i = 0; i < threads; ++i)
     ios[i] = new BoolIO<NetIO>(
-        new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + i),
+        new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + i + 1),
         party == ALICE);
+
+  osuCrypto::Socket sock;
+  if (party == ALICE) {
+    sock = osuCrypto::cp::asioConnect("127.0.0.1:"+string(argv[2]), true);
+  } else {
+    sock = osuCrypto::cp::asioConnect(string(argv[3])+":"+string(argv[2]), false);
+  }     
 
   std::cout << std::endl
             << "------------ TEST VOLETRIPLE ------------"
             << std::endl
             << std::endl;
 
-  cout << "#VOLE: "; int test_nn = 10005354;
+  cout << "#VOLE: " << endl; int test_nn = 10005354;
 
   uint64_t com1, com11;
   com1 = comm(ios);
@@ -35,15 +42,16 @@ int main(int argc, char **argv) {
   // tmptmp
   if (party == ALICE) {
     GMP_PRG_FP prgdelta;
-    mpz_class delta = prgdelta.sample();
+    mpz_class delta; // = prgdelta.sample();
 
-    OprfVoleTriple<BoolIO<NetIO>> vole(party, threads, ios);
+    OprfVoleTriple<BoolIO<NetIO>> vole(party, threads, ios, sock);
 
     auto start = clock_start();
 
-    vole.setup(delta);    
+    vole.setup(delta, sock);    
+    std::cout << delta << std::endl;
     std::vector<mpz_class> vole_yz(test_nn);
-    vole.extend_sender(&vole_yz[0], test_nn);
+    vole.extend_sender(sock, &vole_yz[0], test_nn);
 
     double ttt = time_from(start);
     std::cout << "vole generation: " << ttt << " us" << std::endl; 
@@ -51,6 +59,7 @@ int main(int argc, char **argv) {
     uint64_t com22 = comm2(ios) - com11;
     std::cout << "communication (B): " << com2 << std::endl;
     std::cout << "communication (B): " << com22 << std::endl;
+    std::cout << "comm. libOT (B): " << sock.bytesReceived()+sock.bytesSent() << std::endl; 
 
     // checking the correctness
     std::cout << "starting correctness testing..." << std::endl;
@@ -66,14 +75,16 @@ int main(int argc, char **argv) {
         ios[0]->flush();
     }
   } else {
-    OprfVoleTriple<BoolIO<NetIO>> vole(party, threads, ios);
+    OprfVoleTriple<BoolIO<NetIO>> vole(party, threads, ios, sock);
+    mpz_class tmptmp;
 
     auto start = clock_start();
 
-    vole.setup();    
+    vole.setup(tmptmp, sock);    
+    std::cout << tmptmp << std::endl;
     std::vector<mpz_class> vole_yz(test_nn);
     std::vector<mpz_class> vole_x(test_nn);
-    vole.extend_recver(&vole_yz[0], &vole_x[0], test_nn);
+    vole.extend_recver(sock, &vole_yz[0], &vole_x[0], test_nn);
 
     double ttt = time_from(start);
     std::cout << "vole generation: " << ttt << " us" << std::endl;    
@@ -81,6 +92,7 @@ int main(int argc, char **argv) {
     uint64_t com22 = comm2(ios) - com11;
     std::cout << "communication (B): " << com2 << std::endl;
     std::cout << "communication (B): " << com22 << std::endl;
+    std::cout << "comm. libOT (B): " << sock.bytesReceived()+sock.bytesSent() << std::endl; 
 
     // checking the correctness
     std::cout << "starting correctness testing..." << std::endl;

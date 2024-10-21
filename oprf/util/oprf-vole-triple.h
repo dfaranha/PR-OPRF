@@ -49,6 +49,7 @@ public:
 
   BaseCot<IO> *cot;
   OTPre<IO> *pre_ot = nullptr;
+  LibOTPre<IO> *lib_pre_ot = nullptr;
 
   mpz_class Delta;
   OprfLpnFp<10> *lpn = nullptr;
@@ -70,9 +71,27 @@ public:
     pool = new ThreadPool(threads);
   }
 
+  OprfVoleTriple(int party, int threads, IO **ios, osuCrypto::Socket &sock,
+             OprfPrimalLPNParameterFp param = oprf_fp_default) {
+    this->io = ios[0];
+    this->threads = threads;
+    this->party = party;
+    this->ios = ios;
+    this->param = param;
+    this->extend_initialized = false;
+
+    // cot = new BaseCot<IO>(party, io, true);
+    // cot->cot_gen_pre();
+
+
+    pool = new ThreadPool(threads);
+  }  
+
   ~OprfVoleTriple() {
     if (pre_ot != nullptr)
       delete pre_ot;
+    if (lib_pre_ot != nullptr)
+      delete lib_pre_ot;
     if (lpn != nullptr)
       delete lpn;
     if (pool != nullptr)
@@ -87,6 +106,11 @@ public:
     this->Delta = delta;
     setup();
   }
+
+  // with libOTe
+  void setup(mpz_class& delta, osuCrypto::Socket &sock) {
+    libsetup(delta, sock);
+  }  
 
   mpz_class delta() {
     if (party == ALICE)
@@ -110,6 +134,23 @@ public:
     extend_initialized = true;
   }
 
+  // for libOTe
+  void extend_initialization(osuCrypto::Socket &sock) {
+    lpn = new OprfLpnFp<10>(param.n, param.k, pool, pool->size());
+    mpfss = new OprfMpfssRegFp<IO>(party, threads, param.n, param.t,
+                               param.log_bin_sz, pool, ios);
+    mpfss->set_malicious();
+
+    lib_pre_ot = new LibOTPre<IO>(io, mpfss->tree_height - 1, mpfss->tree_n);
+    if (party == ALICE) lib_pre_ot->send_gen_pre(sock);
+    else lib_pre_ot->recv_gen_pre(sock);      
+
+    M = param.k + param.t + 1;
+    ot_limit = param.n - M;
+    ot_used = ot_limit;
+    extend_initialized = true;
+  }
+
   // sender extend
   void extend_send(mpz_class *y, OprfMpfssRegFp<IO> *mpfss, OTPre<IO> *pre_ot,
                    OprfLpnFp<10> *lpn, mpz_class *key) {
@@ -120,8 +161,17 @@ public:
     delete[] sparse_vec;
   }
 
+  // sender extend --- libOTe
+  void extend_send(mpz_class *y, OprfMpfssRegFp<IO> *mpfss, LibOTPre<IO> *pre_ot,
+                   OprfLpnFp<10> *lpn, mpz_class *key) {
+    mpfss->sender_init(Delta);
+    __uint128_t *sparse_vec = new __uint128_t[lpn->n];
+    mpfss->mpfss(pre_ot, key, sparse_vec, y);
+    lpn->compute_send(y, key + mpfss->tree_n + 1);
+    delete[] sparse_vec;
+  }  
+
   // receiver extend
-  // note: continue TMR, we need to pass one more parameter inside to save the X
   void extend_recv(mpz_class *z, mpz_class *val, OprfMpfssRegFp<IO> *mpfss, OTPre<IO> *pre_ot,
                    OprfLpnFp<10> *lpn, mpz_class *mac, mpz_class *X) {
     mpfss->recver_init();
@@ -135,6 +185,21 @@ public:
     delete[] sparse_vec;
   }
 
+  // receiver extend
+  void extend_recv(mpz_class *z, mpz_class *val, OprfMpfssRegFp<IO> *mpfss, LibOTPre<IO> *pre_ot,
+                   OprfLpnFp<10> *lpn, mpz_class *mac, mpz_class *X) {
+    mpfss->recver_init();
+    __uint128_t *sparse_vec = new __uint128_t[lpn->n];
+    mpfss->mpfss(pre_ot, mac, sparse_vec, z, X); // pause here
+    for (int i = 0; i < lpn->n; i++) val[i] = 0;
+    for (int i = 0; i < mpfss->tree_n; i++) {
+      val[ mpfss->leave_n*i+mpfss->item_pos_recver[i] ] = X[i];
+    }
+    lpn->compute_recv(z, val, mac + mpfss->tree_n + 1, X + mpfss->tree_n + 1);
+    delete[] sparse_vec;
+  }
+
+
   void extend(mpz_class *buffer, mpz_class *buffer_x = NULL) {
     cot->cot_gen(pre_ot, pre_ot->n);
     // memset(buffer, 0, n*sizeof(__uint128_t));
@@ -143,6 +208,24 @@ public:
       for (int i = 0; i < M; i++) pre_yz[i] = buffer[ot_limit+i];
     } else {
       extend_recv(buffer, buffer_x, mpfss, pre_ot, lpn, &pre_yz[0], &pre_x[0]);
+      for (int i = 0; i < M; i++) {
+        pre_yz[i] = buffer[ot_limit+i];
+        pre_x[i] = buffer_x[ot_limit+i];
+      }
+    }
+    //memcpy(pre_yz, buffer + ot_limit, M * sizeof(__uint128_t));
+  }
+
+  void extend(osuCrypto::Socket &sock, mpz_class *buffer, mpz_class *buffer_x = NULL) {
+    //cot->cot_gen(pre_ot, pre_ot->n);
+    // memset(buffer, 0, n*sizeof(__uint128_t));
+    if (party == ALICE) {
+      lib_pre_ot->send_gen(sock);
+      extend_send(buffer, mpfss, lib_pre_ot, lpn, &pre_yz[0]);
+      for (int i = 0; i < M; i++) pre_yz[i] = buffer[ot_limit+i];
+    } else {
+      lib_pre_ot->recv_gen(sock);
+      extend_recv(buffer, buffer_x, mpfss, lib_pre_ot, lpn, &pre_yz[0], &pre_x[0]);
       for (int i = 0; i < M; i++) {
         pre_yz[i] = buffer[ot_limit+i];
         pre_x[i] = buffer_x[ot_limit+i];
@@ -217,6 +300,91 @@ public:
     fut.get();
   }
 
+  // libot's version setup
+  void libsetup(mpz_class& delta, osuCrypto::Socket &sock) {
+    // initialize the main process
+    //ThreadPool pool_tmp(1);
+    //auto fut = pool_tmp.enqueue([this]() { libot_extend_initialization(); });
+
+    // space for pre-processing triples
+    std::vector<mpz_class> pre_yz0(param.n_pre0);
+    std::vector<mpz_class> pre_x0;
+    if (party == BOB) pre_x0.resize(param.n_pre0);
+
+    // pre-processing tools
+    OprfLpnFp<10> lpn_pre0(param.n_pre0, param.k_pre0, pool, pool->size());
+    OprfMpfssRegFp<IO> mpfss_pre0(party, threads, param.n_pre0, param.t_pre0,
+                              param.log_bin_sz_pre0, pool, ios);
+    mpfss_pre0.set_malicious();
+    LibOTPre<IO> pre_ot_ini0(ios[0], mpfss_pre0.tree_height - 1,
+                          mpfss_pre0.tree_n);
+
+    // generate tree_n*(depth-1) COTs
+    //cot->cot_gen(&pre_ot_ini0, pre_ot_ini0.n);
+    if (party == ALICE) {
+      pre_ot_ini0.send_gen_pre(sock);
+      pre_ot_ini0.send_gen(sock);
+    } else {
+      pre_ot_ini0.recv_gen_pre(sock);
+      pre_ot_ini0.recv_gen(sock);
+    }
+
+    // generate 2*tree_n+k_pre triples and extend
+    OprfBaseVole<IO> *svole0;
+    int triple_n0 = 1 + mpfss_pre0.tree_n + param.k_pre0;
+    if (party == ALICE) {
+      std::vector<mpz_class> key(triple_n0);
+      svole0 = new OprfBaseVole<IO>(party, ios[0], delta, sock);
+      this->Delta = delta;
+      svole0->triple_gen_send(key, triple_n0);
+
+      extend_send(&pre_yz0[0], &mpfss_pre0, &pre_ot_ini0, &lpn_pre0, &key[0]);
+    } else {
+      std::vector<mpz_class> mac(triple_n0);
+      std::vector<mpz_class> X(triple_n0);
+      svole0 = new OprfBaseVole<IO>(party, ios[0], sock);
+      svole0->triple_gen_recv(mac, X, triple_n0);
+
+      // one more argument to save expanding X
+      extend_recv(&pre_yz0[0], &pre_x0[0], &mpfss_pre0, &pre_ot_ini0, &lpn_pre0, &mac[0], &X[0]);
+    }
+    delete svole0;
+
+    // space for pre-processing triples
+    pre_yz.resize(param.n_pre);
+    pre_x.resize(param.n_pre);
+
+    // pre-processing tools
+    OprfLpnFp<10> lpn_pre(param.n_pre, param.k_pre, pool, pool->size());
+    OprfMpfssRegFp<IO> mpfss_pre(party, threads, param.n_pre, param.t_pre,
+                             param.log_bin_sz_pre, pool, ios);
+    mpfss_pre.set_malicious();
+    LibOTPre<IO> pre_ot_ini(ios[0], mpfss_pre.tree_height - 1, mpfss_pre.tree_n);
+
+    // generate tree_n*(depth-1) COTs
+    //cot->cot_gen(&pre_ot_ini, pre_ot_ini.n);
+
+    if (party == ALICE) {
+      pre_ot_ini.send_gen_pre(sock);
+      pre_ot_ini.send_gen(sock);      
+    } else {
+      pre_ot_ini.recv_gen_pre(sock);
+      pre_ot_ini.recv_gen(sock);
+    }
+
+    // generate 2*tree_n+k_pre triples and extend
+    if (party == ALICE) {
+      extend_send(&pre_yz[0], &mpfss_pre, &pre_ot_ini, &lpn_pre, &pre_yz0[0]);
+    } else {
+      extend_recv(&pre_yz[0], &pre_x[0], &mpfss_pre, &pre_ot_ini, &lpn_pre, &pre_yz0[0], &pre_x0[0]);
+    }
+    pre_ot_inplace = true;
+
+    //fut.get();
+
+    extend_initialization(sock);  
+  }  
+
   void extend_sender(mpz_class *data_yz, int num) {
     if (vole_triples.size() == 0) vole_triples.resize(param.n);
     if (extend_initialized == false)
@@ -258,6 +426,49 @@ public:
       ot_used = last_round_ot;
     }
   }
+
+  // the version with libOTe
+  void extend_sender(osuCrypto::Socket &sock, mpz_class *data_yz, int num) {
+    if (vole_triples.size() == 0) vole_triples.resize(param.n);
+    if (extend_initialized == false)
+      error("Run setup before extending");
+    if (num <= silent_ot_left()) {
+      for (int i = 0; i < num; i++) data_yz[i] = vole_triples[ot_used+i];
+      //memcpy(data_yz, vole_triples + ot_used, num * sizeof(__uint128_t));
+      this->ot_used += num;
+      return;
+    }
+    mpz_class *pt = data_yz;
+    int gened = silent_ot_left();
+    if (gened > 0) {
+      //memcpy(pt, vole_triples + ot_used, gened * sizeof(__uint128_t));
+      for (int i = 0; i < gened; i++) pt[i] = vole_triples[ot_used+i];
+      pt = &pt[gened];
+    }
+    int round_inplace = (num - gened - M) / ot_limit;
+    int last_round_ot = num - gened - round_inplace * ot_limit;
+    bool round_memcpy = last_round_ot > ot_limit ? true : false;
+    if (round_memcpy)
+      last_round_ot -= ot_limit;
+    for (int i = 0; i < round_inplace; ++i) {
+      extend(sock, pt);
+      ot_used = ot_limit;
+      pt = &pt[ot_limit];
+    }
+    if (round_memcpy) {
+      extend(sock, &vole_triples[0]);
+      for (int i = 0; i < ot_limit; i++) pt[i] = vole_triples[i];
+      //memcpy(pt, vole_triples, ot_limit * sizeof(__uint128_t));
+      ot_used = ot_limit;
+      pt = &pt[ot_limit];
+    }
+    if (last_round_ot > 0) {
+      extend(sock, &vole_triples[0]);
+      for (int i = 0; i < last_round_ot; i++) pt[i] = vole_triples[i];
+      //memcpy(pt, vole_triples, last_round_ot * sizeof(__uint128_t));
+      ot_used = last_round_ot;
+    }
+  }  
 
   void extend_recver(mpz_class *data_yz, mpz_class *data_x, int num) {
     if (vole_triples.size() == 0) {
@@ -311,6 +522,68 @@ public:
     }
     if (last_round_ot > 0) {
       extend(&vole_triples[0], &vole_x[0]);
+      for (int i = 0; i < last_round_ot; i++) {
+        pt[i] = vole_triples[i];
+        pt2[i] = vole_x[i];
+      }
+      //memcpy(pt, vole_triples, last_round_ot * sizeof(__uint128_t));
+      ot_used = last_round_ot;      
+    }
+  }  
+
+  // the version with libOTe
+  void extend_recver(osuCrypto::Socket &sock, mpz_class *data_yz, mpz_class *data_x, int num) {
+    if (vole_triples.size() == 0) {
+      vole_triples.resize(param.n);
+      vole_x.resize(param.n);
+    }
+    if (extend_initialized == false)
+      error("Run setup before extending");
+    if (num <= silent_ot_left()) {
+      for (int i = 0; i < num; i++) {
+        data_yz[i] = vole_triples[ot_used+i];
+        data_x[i] = vole_x[ot_used+i];
+      }
+      //memcpy(data_yz, vole_triples + ot_used, num * sizeof(__uint128_t));
+      this->ot_used += num;
+      return;
+    }
+    mpz_class *pt = data_yz;
+    mpz_class *pt2 = data_x;
+    int gened = silent_ot_left();
+    if (gened > 0) {
+      //memcpy(pt, vole_triples + ot_used, gened * sizeof(__uint128_t));
+      for (int i = 0; i < gened; i++) {
+        pt[i] = vole_triples[ot_used+i];
+        pt2[i] = vole_x[ot_used+i];
+      }
+      pt = &pt[gened];
+      pt2 = &pt2[gened];
+    }
+    int round_inplace = (num - gened - M) / ot_limit;
+    int last_round_ot = num - gened - round_inplace * ot_limit;
+    bool round_memcpy = last_round_ot > ot_limit ? true : false;
+    if (round_memcpy)
+      last_round_ot -= ot_limit;
+    for (int i = 0; i < round_inplace; ++i) {
+      extend(sock, pt, pt2);
+      ot_used = ot_limit;
+      pt = &pt[ot_limit];
+      pt2 = &pt2[ot_limit];
+    }
+    if (round_memcpy) {
+      extend(sock, &vole_triples[0], &vole_x[0]);
+      for (int i = 0; i < ot_limit; i++) {
+        pt[i] = vole_triples[i];
+        pt2[i] = vole_x[i];
+      }
+      //memcpy(pt, vole_triples, ot_limit * sizeof(__uint128_t));
+      ot_used = ot_limit;
+      pt = &pt[ot_limit];
+      pt2 = &pt2[ot_limit];
+    }
+    if (last_round_ot > 0) {
+      extend(sock, &vole_triples[0], &vole_x[0]);
       for (int i = 0; i < last_round_ot; i++) {
         pt[i] = vole_triples[i];
         pt2[i] = vole_x[i];

@@ -34,12 +34,12 @@ void check_triple(NetIO *io, mpz_class *x, mpz_class *y, mpz_class *val, int siz
   }
 }
 
-void test_lpn(NetIO *io, int party) {
+void test_lpn(NetIO *io, int party, osuCrypto::Socket &sock) {
   OprfBaseVole<NetIO> *svole;
 
   // ALICE generate delta
   GMP_PRG_FP prg;
-  mpz_class Delta = prg.sample();
+  mpz_class Delta; // = prg.sample();
 
   // test cases reduced for github action
   int test_n = 10000;
@@ -51,11 +51,11 @@ void test_lpn(NetIO *io, int party) {
   std::vector<mpz_class> x2(test_k);
   
   if (party == ALICE) {
-    svole = new OprfBaseVole<NetIO>(party, io, Delta);    
+    svole = new OprfBaseVole<NetIO>(party, io, Delta, sock);    
     svole->triple_gen_send(mac1, test_n);
     svole->triple_gen_send(mac2, test_k);
   } else {
-    svole = new OprfBaseVole<NetIO>(party, io);
+    svole = new OprfBaseVole<NetIO>(party, io, sock);
     svole->triple_gen_recv(mac1, x1, test_n);
     svole->triple_gen_recv(mac2, x2, test_k);
   }
@@ -84,14 +84,21 @@ void test_lpn(NetIO *io, int party) {
 
 int main(int argc, char **argv) {
   parse_party_and_port(argv, &party, &port);
-  NetIO *io = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port);
+  NetIO *io = new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + 1);
+
+  osuCrypto::Socket sock;
+  if (party == ALICE) {
+    sock = osuCrypto::cp::asioConnect("127.0.0.1:"+string(argv[2]), true);
+  } else {
+    sock = osuCrypto::cp::asioConnect(string(argv[3])+":"+string(argv[2]), false);
+  }    
 
   std::cout << std::endl
             << "------------ LPN ------------" << std::endl
             << std::endl;
   ;
 
-  test_lpn(io, party);
+  test_lpn(io, party, sock);
 
   delete io;
   return 0;
