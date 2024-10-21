@@ -1,3 +1,4 @@
+#define ENABLE_MALICIOUS
 
 #include <gmpxx.h>
 #include <iostream>
@@ -18,8 +19,16 @@ int main(int argc, char **argv) {
   BoolIO<NetIO> *ios[threads];
   for (int i = 0; i < threads; ++i)
     ios[i] = new BoolIO<NetIO>(
-        new NetIO(party == ALICE ? nullptr : argv[3], port + i),
+        new NetIO(party == ALICE ? nullptr : argv[3], port + i + 1),
         party == ALICE);
+
+  osuCrypto::Socket sock;
+  if (party == ALICE) {
+    sock = osuCrypto::cp::asioConnect("127.0.0.1:"+string(argv[2]), true);
+  } else {
+    sock = osuCrypto::cp::asioConnect(string(argv[3])+":"+string(argv[2]), false);
+  }             
+
 
   std::cout << std::endl
             << "------------ TEST MALICIOUS OPRF ------------"
@@ -27,7 +36,7 @@ int main(int argc, char **argv) {
             << std::endl;
 
   // cout << "#VOLE: "; int test_nn = 10005354;
-  int test_nn = 290000; //5354;
+  int test_nn = 290000; //1000; //290000; //5354;
 
   uint64_t com1, com11;
   com1 = comm(ios);
@@ -36,17 +45,17 @@ int main(int argc, char **argv) {
   // tmptmp
   if (party == ALICE) {
     GMP_PRG_FP prgdelta;
-    mpz_class delta = prgdelta.sample();
+    mpz_class delta; // = prgdelta.sample();
 
-    Oprf<BoolIO<NetIO>> oprf(party, threads, ios);
+    Oprf<BoolIO<NetIO>> oprf(party, threads, ios, sock);
 
     auto start = clock_start();
 
-    oprf.setup(delta); 
-    oprf.setup_malicious(); 
+    oprf.setup(delta, sock); 
+    oprf.setup_malicious(sock);
     //oprf.malicious_offline(100000);
     //oprf.oprf_eval_server();   
-    oprf.oprf_batch_eval_server(test_nn);
+    oprf.oprf_batch_eval_server(test_nn, sock);
 
     double ttt = time_from(start);
     std::cout << "oprf eval: " << ttt << " us" << std::endl; 
@@ -54,6 +63,7 @@ int main(int argc, char **argv) {
     uint64_t com22 = comm2(ios) - com11;
     std::cout << "communication (B): " << com2 << std::endl;
     std::cout << "communication (B): " << com22 << std::endl;
+    std::cout << "comm. libOT (B): " << sock.bytesReceived()+sock.bytesSent() << std::endl; 
 
     std::cout << "correctness checking..." << std::endl;
     std::vector<uint8_t> ext(48);
@@ -61,17 +71,18 @@ int main(int argc, char **argv) {
     ios[0]->send_data(&ext[0], 48);
     ios[0]->flush();
   } else {
-    Oprf<BoolIO<NetIO>> oprf(party, threads, ios);
+    Oprf<BoolIO<NetIO>> oprf(party, threads, ios, sock);
+    mpz_class tmptmp;
 
     auto start = clock_start();
 
-    oprf.setup();
-    oprf.setup_malicious(); 
+    oprf.setup(tmptmp, sock);
+    oprf.setup_malicious(sock); 
     //oprf.malicious_offline(100000);
     std::vector<mpz_class> in(test_nn);
     for (int i = 0; i < test_nn; i++) in[i] = i;
     std::vector<mpz_class> out(test_nn);
-    oprf.oprf_batch_eval_client(&in[0], test_nn, out);
+    oprf.oprf_batch_eval_client(&in[0], test_nn, out, sock);
 
     double ttt = time_from(start);
     std::cout << "oprf eval: " << ttt << " us" << std::endl;    
@@ -79,6 +90,7 @@ int main(int argc, char **argv) {
     uint64_t com22 = comm2(ios) - com11;
     std::cout << "communication (B): " << com2 << std::endl;
     std::cout << "communication (B): " << com22 << std::endl;
+    std::cout << "comm. libOT (B): " << sock.bytesReceived()+sock.bytesSent() << std::endl; 
 
     std::cout << "correctness checking..." << std::endl;
     std::vector<uint8_t> ext(48);

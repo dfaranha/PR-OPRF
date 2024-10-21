@@ -1,3 +1,4 @@
+#define ENABLE_MALICIOUS // we have to do this to ahieve half-malicious
 
 #include <gmpxx.h>
 #include <iostream>
