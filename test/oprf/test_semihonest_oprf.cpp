@@ -43,15 +43,15 @@ int main(int argc, char **argv) {
   // tmptmp
   if (party == ALICE) {
     GMP_PRG_FP prgdelta;
-    mpz_class delta = prgdelta.sample();
+    mpz_class delta; // = prgdelta.sample();
 
-    Oprf<BoolIO<NetIO>> oprf(party, threads, ios);
+    Oprf<BoolIO<NetIO>> oprf(party, threads, ios, sock);
 
     auto start = clock_start();
 
-    oprf.setup(delta); 
+    oprf.setup(delta, sock); 
     //oprf.oprf_eval_server();   
-    oprf.oprf_batch_eval_server(test_nn);
+    oprf.oprf_batch_eval_server(test_nn, sock);
 
     double ttt = time_from(start);
     std::cout << "oprf eval: " << ttt << " us" << std::endl; 
@@ -67,15 +67,16 @@ int main(int argc, char **argv) {
     ios[0]->send_data(&ext[0], 48);
     ios[0]->flush();
   } else {
-    Oprf<BoolIO<NetIO>> oprf(party, threads, ios);
+    mpz_class tmptmp;
+    Oprf<BoolIO<NetIO>> oprf(party, threads, ios, sock);
 
     auto start = clock_start();
 
-    oprf.setup();
+    oprf.setup(tmptmp, sock);
     std::vector<mpz_class> in(test_nn);
     for (int i = 0; i < test_nn; i++) in[i] = i;
     std::vector<mpz_class> out(test_nn);
-    oprf.oprf_batch_eval_client(&in[0], test_nn, out);
+    oprf.oprf_batch_eval_client(&in[0], test_nn, out, sock);
 
     double ttt = time_from(start);
     std::cout << "oprf eval: " << ttt << " us" << std::endl;    
@@ -84,7 +85,7 @@ int main(int argc, char **argv) {
     std::cout << "communication (B): " << com2 << std::endl;
     std::cout << "communication (B): " << com22 << std::endl;
     std::cout << "comm. libOT (B): " << sock.bytesReceived()+sock.bytesSent() << std::endl; 
-    
+
     std::cout << "correctness checking..." << std::endl;
     std::vector<uint8_t> ext(48);
     ios[0]->recv_data(&ext[0], 48);

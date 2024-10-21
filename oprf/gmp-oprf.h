@@ -39,6 +39,21 @@ public:
     generate_coeff(epsilon); // this is only useful for the malicious case
   }
 
+  Oprf(int party, int threads, IO **ios, osuCrypto::Socket &sock,int epsilon = 4) : vole(party, threads, ios, sock), zkvole(3-party, threads, ios, sock) {
+    if (128 % epsilon != 0 || epsilon > 16) {
+      cout << "invalid epsilon!" << endl;
+      abort();
+    }
+    this->epsilon = epsilon;    
+    this->io = ios[0];
+    this->ios = ios;
+    this->party = party;
+    this->threads = threads;
+
+    // gmp_setup();
+    generate_coeff(epsilon); // this is only useful for the malicious case
+  }
+
   void setup(mpz_class delta) {
     this->Delta = delta;
     vole.setup(delta);
@@ -46,6 +61,11 @@ public:
 
   void setup() {
     vole.setup();
+  }
+
+  // setup with libOTe
+  void setup(mpz_class &delta, osuCrypto::Socket &sock) {
+    vole.setup(delta, sock);
   }
 
   // setup the inverse direction vole for zk
@@ -425,6 +445,32 @@ public:
     io->flush();
   }
 
+
+  // batch eval --- libOTe
+  void oprf_batch_eval_server(const int &sz, osuCrypto::Socket &sock) {
+    if (is_malicious) {
+      oprf_batch_eval_server_malicious(sz);
+      return;
+    }
+    std::vector<uint8_t> ext(48 * sz);
+    std::vector<mpz_class> share(sz);
+    vole.extend_sender(sock, &share[0], sz);
+    io->recv_data(&ext[0], 48 * sz);
+    mpz_class msg1, msg2, alphae;
+    GMP_PRG_FP prg;
+    for (int i = 0; i < sz; i++) {
+      msg1 = hex_compose(&ext[48 * i]);
+      msg2 = ((msg1 - share[i]) % gmp_P + gmp_P) % gmp_P;
+      alphae = prg.sample();
+      for (int j = 0; j < 128; j++) alphae = (alphae * alphae) % gmp_P;
+      msg2 = (msg2 * alphae) % gmp_P;
+      for (int j = 48 * i; j < 48 * (i+1); j++) ext[j] = 0;
+      hex_decompose(msg2, &ext[48 * i]);
+    }
+    io->send_data(&ext[0], 48 * sz);
+    io->flush();
+  }  
+
   void oprf_batch_eval_client_malicious(const mpz_class *x, const int &sz, std::vector<mpz_class> &y) {
     if (cur + sz > alpha.size()) malicious_offline(sz); // TODO: we can first use-up all the leftover correlations than extend
     std::vector<uint8_t> ext(48 * sz);
@@ -499,6 +545,31 @@ public:
       y[i] = gmp_raise(msg2 * gmp_inverse(a[i]) % gmp_P);
     }
   }
+
+  // batch eval --- libOTe
+  void oprf_batch_eval_client(const mpz_class *x, const int &sz, std::vector<mpz_class> &y, osuCrypto::Socket &sock) {
+    if (is_malicious) {
+      oprf_batch_eval_client_malicious(x, sz, y);
+      return;
+    }
+    std::vector<uint8_t> ext(48 * sz);
+    y.resize(sz);
+    std::vector<mpz_class> share(sz), a(sz);
+    vole.extend_recver(sock, &share[0], &a[0], sz);
+    mpz_class msg1;
+    for (int i = 0; i < sz; i++) {
+      msg1 = (a[i] * x[i] + share[i]) % gmp_P;
+      hex_decompose(msg1, &ext[48 * i]);
+    }
+    io->send_data(&ext[0], 48 * sz);
+    io->flush();
+    io->recv_data(&ext[0], 48 * sz);
+    mpz_class msg2;
+    for (int i = 0; i < sz; i++) {
+      msg2 = hex_compose(&ext[48 * i]);
+      y[i] = gmp_raise(msg2 * gmp_inverse(a[i]) % gmp_P);
+    }
+  }  
 
 };
 
