@@ -15,6 +15,9 @@ public:
   OprfVoleTriple<IO> vole;
   OprfVoleTriple<IO> zkvole;
 
+  std::unique_ptr<OprfBaseVole<IO>> basevole = nullptr;
+  std::unique_ptr<OprfBaseVole<IO>> basezkvole = nullptr;
+
   mpz_class mac_oprf_key;
   std::vector<mpz_class> oprf_mac, oprf_a;
   std::vector<mpz_class> zk_mac;
@@ -69,6 +72,16 @@ public:
     this->Delta = delta;
   }
 
+  // setup with libOTe and BaseVole
+  void setup_base(mpz_class &delta, osuCrypto::Socket &sock) {
+    if (party == ALICE) {
+      basevole = std::make_unique<OprfBaseVole<IO>>(party, ios[0], delta, sock);
+      this->Delta = delta;
+    } else {
+      basevole = std::make_unique<OprfBaseVole<IO>>(party, ios[0], sock);
+    }
+  }
+
   // setup the inverse direction vole for zk
   // ask the server to commit to the oprf key Delta
   void setup_malicious() {
@@ -117,6 +130,33 @@ public:
       mac_oprf_key = (mac_oprf_key + (gmp_P - (hex_compose(&ext[0]) * zkDelta % gmp_P))) % gmp_P;
     }
   }  
+
+  // setup the inverse direction vole for zk
+  // ask the server to commit to the oprf key Delta
+  // with libOTe // and base for single eval
+  void setup_malicious_base(osuCrypto::Socket &sock) {
+    is_malicious = true;
+    if (party == ALICE) {
+      basezkvole = std::make_unique<OprfBaseVole<IO>>(3-party, ios[0], sock);
+      std::vector<mpz_class> x(1);
+      std::vector<mpz_class> w(1);
+      basezkvole->triple_gen_recv(w, x, 1);
+      mac_oprf_key = w[0];
+      std::vector<uint8_t> ext(48);
+      x[0] = (Delta + gmp_P - x[0]) % gmp_P;
+      hex_decompose(x[0], &ext[0]);
+      io->send_data(&ext[0], 48);
+      io->flush();
+    } else {
+      basezkvole = std::make_unique<OprfBaseVole<IO>>(3-party, ios[0], zkDelta, sock);
+      std::vector<mpz_class> v(1);
+      basezkvole->triple_gen_send(v, 1);
+      mac_oprf_key = v[0];
+      std::vector<uint8_t> ext(48);
+      io->recv_data(&ext[0], 48);
+      mac_oprf_key = (mac_oprf_key + (gmp_P - (hex_compose(&ext[0]) * zkDelta % gmp_P))) % gmp_P;
+    }
+  }    
 
   void malicious_offline(int sz) {
     cur = 0;
@@ -769,7 +809,6 @@ public:
     io->flush();
   }
 
-
   // batch eval --- libOTe
   void oprf_batch_eval_server(const int &sz, osuCrypto::Socket &sock) {
     if (is_malicious) {
@@ -794,6 +833,34 @@ public:
     io->send_data(&ext[0], 48 * sz);
     io->flush();
   }  
+
+  // batch eval --- libOTe
+  // base single
+  void oprf_batch_eval_server_base(const int &sz, osuCrypto::Socket &sock) {
+    if (is_malicious) {
+      oprf_batch_eval_server_malicious(sz, sock); // TODO change this
+      return;
+    }
+    std::vector<uint8_t> ext(48 * sz);
+    std::vector<mpz_class> share(sz);
+    //vole.extend_sender(sock, &share[0], sz);
+    basevole->triple_gen_send(share, sz);
+    io->recv_data(&ext[0], 48 * sz);
+    mpz_class msg1, msg2, alphae;
+    GMP_PRG_FP prg;
+    for (int i = 0; i < sz; i++) {
+      msg1 = hex_compose(&ext[48 * i]);
+      msg2 = ((msg1 - share[i]) % gmp_P + gmp_P) % gmp_P;
+      alphae = prg.sample();
+      for (int j = 0; j < 128; j++) alphae = (alphae * alphae) % gmp_P;
+      msg2 = (msg2 * alphae) % gmp_P;
+      for (int j = 48 * i; j < 48 * (i+1); j++) ext[j] = 0;
+      hex_decompose(msg2, &ext[48 * i]);
+    }
+    io->send_data(&ext[0], 48 * sz);
+    io->flush();
+  }  
+
 
   void oprf_batch_eval_client_malicious(const mpz_class *x, const int &sz, std::vector<mpz_class> &y) {
     if (cur + sz > alpha.size()) malicious_offline(sz); // TODO: we can first use-up all the leftover correlations than extend
@@ -946,6 +1013,33 @@ public:
       y[i] = gmp_raise(msg2 * gmp_inverse(a[i]) % gmp_P);
     }
   }  
+
+  // batch eval --- libOTe
+  // base single
+  void oprf_batch_eval_client_base(const mpz_class *x, const int &sz, std::vector<mpz_class> &y, osuCrypto::Socket &sock) {
+    if (is_malicious) {
+      oprf_batch_eval_client_malicious(x, sz, y, sock); // TODO: update this
+      return;
+    }
+    std::vector<uint8_t> ext(48 * sz);
+    y.resize(sz);
+    std::vector<mpz_class> share(sz), a(sz);
+    //vole.extend_recver(sock, &share[0], &a[0], sz);
+    basevole->triple_gen_recv(share, a, sz);
+    mpz_class msg1;
+    for (int i = 0; i < sz; i++) {
+      msg1 = (a[i] * x[i] + share[i]) % gmp_P;
+      hex_decompose(msg1, &ext[48 * i]);
+    }
+    io->send_data(&ext[0], 48 * sz);
+    io->flush();
+    io->recv_data(&ext[0], 48 * sz);
+    mpz_class msg2;
+    for (int i = 0; i < sz; i++) {
+      msg2 = hex_compose(&ext[48 * i]);
+      y[i] = gmp_raise(msg2 * gmp_inverse(a[i]) % gmp_P);
+    }
+  }    
 
 };
 
