@@ -75,10 +75,10 @@ public:
   // setup with libOTe and BaseVole
   void setup_base(mpz_class &delta, osuCrypto::Socket &sock) {
     if (party == ALICE) {
-      basevole = std::make_unique<OprfBaseVole<IO>>(party, ios[0], delta, sock);
+      basevole = std::make_unique<OprfBaseVole<IO>>(party, ios[0], delta, sock, false);
       this->Delta = delta;
     } else {
-      basevole = std::make_unique<OprfBaseVole<IO>>(party, ios[0], sock);
+      basevole = std::make_unique<OprfBaseVole<IO>>(party, ios[0], sock, false);
     }
   }
 
@@ -137,7 +137,7 @@ public:
   void setup_malicious_base(osuCrypto::Socket &sock) {
     is_malicious = true;
     if (party == ALICE) {
-      basezkvole = std::make_unique<OprfBaseVole<IO>>(3-party, ios[0], sock);
+      basezkvole = std::make_unique<OprfBaseVole<IO>>(3-party, ios[0], sock, true);
       std::vector<mpz_class> x(1);
       std::vector<mpz_class> w(1);
       basezkvole->triple_gen_recv(w, x, 1);
@@ -148,7 +148,7 @@ public:
       io->send_data(&ext[0], 48);
       io->flush();
     } else {
-      basezkvole = std::make_unique<OprfBaseVole<IO>>(3-party, ios[0], zkDelta, sock);
+      basezkvole = std::make_unique<OprfBaseVole<IO>>(3-party, ios[0], zkDelta, sock, true);
       std::vector<mpz_class> v(1);
       basezkvole->triple_gen_send(v, 1);
       mac_oprf_key = v[0];

@@ -9,6 +9,10 @@
 #include <vector>
 #include <array>
 
+osuCrypto::BitVector saved_choices(128);
+osuCrypto::AlignedUnVector<osuCrypto::block> saved_rMsgs(128);
+osuCrypto::AlignedUnVector<std::array<osuCrypto::block, 2>> saved_sMsgs(128);
+
 template <typename IO> class OprfCope {
 public:
   int party;
@@ -57,6 +61,81 @@ public:
     
   }
 
+  // sender_LIBOT
+  // Malicious Single Saving OT Tricks
+  void initialize(mpz_class &delta, osuCrypto::Socket &sock, bool exists) {
+
+    if (exists == 0) {
+      osuCrypto::BitVector choices(oprf_P_len + 128);
+      osuCrypto::AlignedUnVector<osuCrypto::block> rMsgs(oprf_P_len + 128);
+      libotpre::preot_receiver(oprf_P_len + 128, choices, rMsgs, sock);
+
+      // to be optimized; todo
+      string res = "";
+      for (int i = 0; i < oprf_P_len; i++) {
+        if (choices[i]) {
+          delta_bool[i] = 1;
+          res = "1" + res;
+        } else {
+          delta_bool[i] = 0;
+          res = "0" + res;
+        }
+      }
+
+      delta.set_str(res.c_str(), 2);
+      this->delta = delta;
+
+      G0.resize(m);
+      for (int i = 0; i < m; ++i) {
+        block tmpbl;
+        memcpy(&tmpbl, &rMsgs[i], sizeof(block));
+        G0[i].reseed(&tmpbl);
+      }
+
+      for (int i = 0; i < 128; i++) {
+        saved_choices[i] = choices[oprf_P_len + i];
+        saved_rMsgs[i] = rMsgs[oprf_P_len + i];
+      }
+    } else {
+
+      osuCrypto::BitVector choices(oprf_P_len);
+      osuCrypto::AlignedUnVector<osuCrypto::block> rMsgs(oprf_P_len);
+      OTExtTypeReceiver receiver;
+      osuCrypto::PRNG prng(osuCrypto::sysRandomSeed());
+
+      receiver.setBaseOts(saved_sMsgs);
+
+      // OT extension
+      choices.randomize(prng);
+      coproto::sync_wait(receiver.receive(choices, rMsgs, prng, sock));
+      coproto::sync_wait(sock.flush());       
+      
+      // to be optimized; todo
+      string res = "";
+      for (int i = 0; i < oprf_P_len; i++) {
+        if (choices[i]) {
+          delta_bool[i] = 1;
+          res = "1" + res;
+        } else {
+          delta_bool[i] = 0;
+          res = "0" + res;
+        }
+      }
+
+      delta.set_str(res.c_str(), 2);
+      this->delta = delta;
+
+      G0.resize(m);
+      for (int i = 0; i < m; ++i) {
+        block tmpbl;
+        memcpy(&tmpbl, &rMsgs[i], sizeof(block));
+        G0[i].reseed(&tmpbl);
+      }
+
+    }
+    
+  }
+
   // sender_EMPOT
   void initialize(const mpz_class &delta) {
 
@@ -89,6 +168,51 @@ public:
     }
 
   }
+
+  // recver_LIBOT
+  // Malicious Single Saving OT Tricks
+  void initialize(osuCrypto::Socket &sock, bool exists) {
+
+    if (exists == 0) {
+      osuCrypto::AlignedUnVector<std::array<osuCrypto::block, 2>> sMsgs(oprf_P_len + 128);
+      libotpre::preot_sender(oprf_P_len + 128, sMsgs, sock);
+
+      G0.resize(m); G1.resize(m);
+      for (int i = 0; i < m; i++) {
+        block tmpbl;
+        memcpy(&tmpbl, &sMsgs[i][0], sizeof(block));
+        G0[i].reseed(&tmpbl);
+        memcpy(&tmpbl, &sMsgs[i][1], sizeof(block));
+        G1[i].reseed(&tmpbl);
+      }
+
+      for (int i = 0; i < 128; i++) saved_sMsgs[i] = sMsgs[oprf_P_len + i];
+    } else {
+      
+      osuCrypto::AlignedUnVector<std::array<osuCrypto::block, 2>> sMsgs(oprf_P_len);
+
+      OTExtTypeSender sender;
+      osuCrypto::PRNG prng(osuCrypto::sysRandomSeed());
+
+      // setup base OTs
+      sender.setBaseOts(saved_rMsgs, saved_choices);
+
+      // OT extension
+      coproto::sync_wait(sender.send(sMsgs, prng, sock));
+      coproto::sync_wait(sock.flush());
+
+      G0.resize(m); G1.resize(m);
+      for (int i = 0; i < m; i++) {
+        block tmpbl;
+        memcpy(&tmpbl, &sMsgs[i][0], sizeof(block));
+        G0[i].reseed(&tmpbl);
+        memcpy(&tmpbl, &sMsgs[i][1], sizeof(block));
+        G1[i].reseed(&tmpbl);
+      }
+
+    }
+
+  }  
   
   // recver_EMPOT
   void initialize() {

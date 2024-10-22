@@ -28,6 +28,16 @@ public:
     this->Delta = Delta;
   }  
 
+  // SENDER_LIBOT
+  // For Malicious Single Point
+  // Save More by OT Extensions to Operate As Seeds in Other Direction
+  OprfBaseVole(int party, IO *io, mpz_class &Delta, osuCrypto::Socket &sock, bool exists) : cope(party, io, oprf_P_len) {
+    this->party = party;
+    this->io = io;
+    cope.initialize(Delta, sock, exists);    
+    this->Delta = Delta;
+  }    
+
   // RECEIVER
   OprfBaseVole(int party, IO *io) : cope(party, io, oprf_P_len) {
     this->party = party;
@@ -40,6 +50,15 @@ public:
     this->party = party;
     this->io = io;
     cope.initialize(sock);
+  }
+
+  // RECEIVER_LIBOT
+  // For Malicious Single Point
+  // Save More by OT Extensions to Operate As Seeds in Other Direction
+  OprfBaseVole(int party, IO *io, osuCrypto::Socket &sock, bool exists) : cope(party, io, oprf_P_len) {
+    this->party = party;
+    this->io = io;
+    cope.initialize(sock, exists);
   }
 
   // sender
