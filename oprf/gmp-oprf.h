@@ -25,6 +25,7 @@ public:
 
   std::unique_ptr<OprfBaseVole<IO>> basevole = nullptr;
   std::unique_ptr<OprfBaseVole<IO>> basezkvole = nullptr;
+  std::unique_ptr<SoftSpokenOprfBaseVole<IO>> basezkvole2 = nullptr;
 
   mpz_class mac_oprf_key;
   std::vector<mpz_class> oprf_mac, oprf_a;
@@ -144,11 +145,18 @@ public:
   // with libOTe // and base for single eval
   void setup_malicious_base(osuCrypto::Socket &sock) {
     is_malicious = true;
+    auto desired_size = 128/epsilon + (1<<epsilon) + 4;
     if (party == ALICE) {
-      basezkvole = std::make_unique<OprfBaseVole<IO>>(3-party, ios[0], sock, true);
       std::vector<mpz_class> x(1);
       std::vector<mpz_class> w(1);
-      basezkvole->triple_gen_recv(w, x, 1);
+
+      // basezkvole = std::make_unique<OprfBaseVole<IO>>(3-party, ios[0], sock, true);
+      // basezkvole->triple_gen_recv(w, x, 1);
+
+      basezkvole2 = std::make_unique<SoftSpokenOprfBaseVole<IO>>(3-party, ios[0]);
+      basezkvole2->sender_prepare(desired_size, sock);
+      basezkvole2->triple_gen_recv(w, x, 1);
+
       mac_oprf_key = w[0];
       std::vector<uint8_t> ext(48);
       x[0] = (Delta + gmp_P - x[0]) % gmp_P;
@@ -156,9 +164,17 @@ public:
       io->send_data(&ext[0], 48);
       io->flush();
     } else {
-      basezkvole = std::make_unique<OprfBaseVole<IO>>(3-party, ios[0], zkDelta, sock, true);
       std::vector<mpz_class> v(1);
-      basezkvole->triple_gen_send(v, 1);
+
+      // basezkvole = std::make_unique<OprfBaseVole<IO>>(3-party, ios[0], zkDelta, sock, true);
+      // basezkvole->triple_gen_send(v, 1);
+      // cout << v[0] << ' ' << basezkvole->Delta << endl;
+
+      basezkvole2 = std::make_unique<SoftSpokenOprfBaseVole<IO>>(3-party, ios[0]);
+      basezkvole2->receiver_prepare(desired_size, sock);
+      basezkvole2->triple_gen_send(v, 1);   
+      zkDelta = basezkvole2->Delta;   
+
       mac_oprf_key = v[0];
       std::vector<uint8_t> ext(48);
       io->recv_data(&ext[0], 48);
@@ -693,21 +709,28 @@ public:
     if (party == ALICE) {
       tmp_r.resize(sz+1);
       basevole->triple_gen_send(oprf_mac, sz+1);
-      basezkvole->triple_gen_recv(zk_mac, tmp_r, sz+1);
+      //basezkvole->triple_gen_recv(zk_mac, tmp_r, sz+1);
+      basezkvole2->triple_gen_recv(zk_mac, tmp_r, sz+1);
       r.resize(sz * (inter_cnt + 1));
       r_mac.resize(sz * (inter_cnt + 1));
-      basezkvole->triple_gen_recv(r_mac, r, sz * (inter_cnt + 1));
+      //basezkvole->triple_gen_recv(r_mac, r, sz * (inter_cnt + 1));
+      basezkvole2->triple_gen_recv(r_mac, r, sz * (inter_cnt + 1));
       otp_mac.resize(coeff_cnt-1);
       otp.resize(coeff_cnt-1);      
-      basezkvole->triple_gen_recv(otp_mac, otp, coeff_cnt-1);
+      //basezkvole->triple_gen_recv(otp_mac, otp, coeff_cnt-1);
+      basezkvole2->triple_gen_recv(otp_mac, otp, coeff_cnt-1);
+      std::cout << 1+sz+1+sz*(inter_cnt + 1)+coeff_cnt-1 << std::endl;
     } else {
       oprf_a.resize(sz+1); // only client needs to resize the "blinding" a's
       basevole->triple_gen_recv(oprf_mac, oprf_a, sz+1);
-      basezkvole->triple_gen_send(zk_mac, sz+1);
+      //basezkvole->triple_gen_send(zk_mac, sz+1);
+      basezkvole2->triple_gen_send(zk_mac, sz+1);
       r_mac.resize(sz * (inter_cnt + 1));
-      basezkvole->triple_gen_send(r_mac, sz * (inter_cnt + 1));
+      //basezkvole->triple_gen_send(r_mac, sz * (inter_cnt + 1));
+      basezkvole2->triple_gen_send(r_mac, sz * (inter_cnt + 1));
       otp_mac.resize(coeff_cnt-1);
-      basezkvole->triple_gen_send(otp_mac, coeff_cnt-1);
+      //basezkvole->triple_gen_send(otp_mac, coeff_cnt-1);
+      basezkvole2->triple_gen_send(otp_mac, coeff_cnt-1);
     } 
 
     std::cout << "VOLE generations:" << std::endl;
@@ -1083,8 +1106,8 @@ public:
     // final zk padding
     std::vector<mpz_class> pad1(1);
     std::vector<mpz_class> pad0(1);
-    //zkvole.extend_recver(sock, &pad0, &pad1, 1);
-    basezkvole->triple_gen_recv(pad0, pad1, 1);    
+    //basezkvole2->triple_gen_recv(pad0, pad1, 1);    
+    basezkvole2->triple_gen_recv(pad0, pad1, 1);    
     if (cur + sz > alpha.size()) malicious_offline_base(sz, sock); // TODO: we can first use-up all the leftover correlations than extend
     std::vector<uint8_t> ext(48 * sz);
     io->recv_data(&ext[0], 48 * sz);
@@ -1309,7 +1332,8 @@ public:
   // base single
   void oprf_batch_eval_client_malicious_base(const mpz_class *x, const int &sz, std::vector<mpz_class> &y, osuCrypto::Socket &sock) {
     std::vector<mpz_class> pad(1);    
-    basezkvole->triple_gen_send(pad, 1);    
+    //basezkvole->triple_gen_send(pad, 1);    
+    basezkvole2->triple_gen_send(pad, 1);    
     if (cur + sz > alpha.size()) malicious_offline_base(sz, sock); // TODO: we can first use-up all the leftover correlations than extend
     std::vector<uint8_t> ext(48 * sz);
     y.resize(sz);

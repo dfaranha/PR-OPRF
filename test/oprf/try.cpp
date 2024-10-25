@@ -31,6 +31,14 @@ int port, party;
 const int threads = 1;
 
 int main(int argc, char **argv) {
+
+  parse_party_and_port(argv, &party, &port);
+  BoolIO<NetIO> *ios[threads];
+  for (int i = 0; i < threads; ++i)
+    ios[i] = new BoolIO<NetIO>(
+        new NetIO(party == ALICE ? nullptr : "127.0.0.1", port + i + 1),
+        party == ALICE);
+
   mpz_class num("500");
   std::vector<uint8_t> x(48);
   mpz_export(&x[0], NULL, -1, 1, 0, 0, num.get_mpz_t());
@@ -70,6 +78,20 @@ int main(int argc, char **argv) {
     osuCrypto::AlignedUnVector<osuCrypto::block> rMsgs(extotnum);
     coproto::sync_wait(extreceiver.receive(extchoices, rMsgs, prng, sock));
     coproto::sync_wait(sock.flush());
+
+    SVOLE_GGM<BoolIO<NetIO>> sss(party, ios[0], 8);
+    std::vector<block> seed;
+    int punch; int zerozero = 0;
+    sss.ggm_recv(rMsgs, extchoices, zerozero, seed, punch);
+    
+    for (int i = 0; i < seed.size(); i++) cout << i << ' ' << seed[i] << endl;
+    cout << "punch point: " << punch << endl;
+
+    zerozero = 8;
+    sss.ggm_recv(rMsgs, extchoices, zerozero, seed, punch);
+    
+    for (int i = 0; i < seed.size(); i++) cout << i << ' ' << seed[i] << endl;
+    cout << "punch point: " << punch << endl;
 
     // libotpre::preot_receiver(extotnum, extchoices, rMsgs, sock);
 
@@ -136,6 +158,14 @@ int main(int argc, char **argv) {
 
     // libotpre::preot_sender(extotnum, sMsgs, sock);
 
+    SVOLE_GGM<BoolIO<NetIO>> sss(party, ios[0], 8);
+    std::vector<block> seed;
+    int punch; int zerozero = 0;
+    sss.ggm_send(sMsgs, zerozero, seed);
+    for (int i = 0; i < seed.size(); i++) cout << i << ' ' << seed[i] << endl;
+    zerozero = 8;
+    sss.ggm_send(sMsgs, zerozero, seed);
+    for (int i = 0; i < seed.size(); i++) cout << i << ' ' << seed[i] << endl;
 
     for (int i = 0; i < 10; i++) {
       std::cout << i << ':' << std::endl;
