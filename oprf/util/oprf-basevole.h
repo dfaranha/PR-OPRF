@@ -315,6 +315,28 @@ public:
     io->recv_data(&prg_seed, sizeof(block));
     GMP_PRG_FP pprg(&prg_seed);
 
+    std::vector<mpz_class> coeff_ch(m);
+    for (int i = 0; i < m; i++) coeff_ch[i] = pprg.sample();
+
+    // adding consistancy check
+    mpz_class check_u = u[m];    
+    for (int i = 0; i < m; i++) {
+      check_u = (check_u + u[i] * coeff_ch[i]) % gmp_P;
+    }
+    std::vector<uint8_t> ext(48);
+    hex_decompose(check_u, &ext[0]);
+    io->send_data(&ext[0], 48);
+    for (int i = 0; i < softspoken_rep; i++) {
+      mpz_class check_w = w[i * (m+1) + m];
+      for (int j = 0; j < m; j++) {
+        check_w = (check_w + w[i * (m+1) + j] * coeff_ch[j]) % gmp_P;
+      }
+      std::vector<uint8_t> ext1(48);
+      hex_decompose(check_w, &ext1[0]);
+      io->send_data(&ext1[0], 48);
+    }
+    io->flush();
+
     std::vector<mpz_class> coeff(softspoken_rep);
     for (int i = 0; i < softspoken_rep; i++) coeff[i] = pprg.sample();
     U.resize(m); W.resize(m);
@@ -389,8 +411,31 @@ public:
 
     GMP_PRG_FP pprg(&prg_seed);
 
+    // adding consistancy check
+
+    std::vector<mpz_class> coeff_ch(m);
+    for (int i = 0; i < m; i++) coeff_ch[i] = pprg.sample();
+    
+    io->recv_data(&ext[0], 48);
+    mpz_class check_u = hex_compose(&ext[0]);    
+    check_u = gmp_P - check_u;
+    for (int i = 0; i < softspoken_rep; i++) {
+      io->recv_data(&ext[0], 48);
+      mpz_class check_w = hex_compose(&ext[0]); 
+      mpz_class check_v = v[i * (m+1) + m];
+      for (int j = 0; j < m; j++) {
+        check_v = (check_v + v[i * (m+1) + j] * coeff_ch[j]) % gmp_P;
+      }
+      mpz_class check = (check_u * (punch[i] + 1) + check_w) % gmp_P;
+      if (check != check_v) {
+        std::cout << "CHEAT at " << i << std::endl;
+        exit(-1);
+      }
+    }
+
     std::vector<mpz_class> coeff(softspoken_rep);
     for (int i = 0; i < softspoken_rep; i++) coeff[i] = pprg.sample();
+
     V.resize(m);
 
     for (int i = 0; i < m; i++) {
