@@ -258,6 +258,211 @@ public:
     this->io = io;
   }
 
+  void sender_prepare_mali(int m, osuCrypto::Socket &sock) {
+    cur = 0;
+
+    osuCrypto::AlignedUnVector<std::array<osuCrypto::block, 2>> sMsgs(softspoken_t * softspoken_rep + 128);
+
+    OTExtTypeSender sender;
+    osuCrypto::PRNG prng(osuCrypto::sysRandomSeed());
+
+    // setup base OTs
+    sender.setBaseOts(saved_rMsgs, saved_choices);
+
+    // OT extension
+    coproto::sync_wait(sender.send(sMsgs, prng, sock));
+    coproto::sync_wait(sock.flush());
+
+    // saving OT for the other direction extension
+    for (int i = 0; i < 128; i++) {
+      saved_sMsgs[i] = sMsgs[softspoken_t * softspoken_rep + i];
+    }
+
+    // preparing VOLEs
+    SVOLE_GGM ggm(party, io, softspoken_t);
+
+    int shift = 1 << softspoken_t;
+
+    std::vector<GMP_PRG_FP> G(softspoken_rep * shift);
+    std::vector<block> seed;
+    for (int i = 0; i < softspoken_rep; i++) {      
+      ggm.ggm_send(sMsgs, i*softspoken_t, seed);
+      for (int j = 0; j < shift; j++)
+        G[i * shift + j].reseed(&seed[j]);
+    }
+
+    std::vector<mpz_class> u(softspoken_rep * (m+1));
+    std::vector<mpz_class> w(softspoken_rep * (m+1));
+    for (int i = 0; i < softspoken_rep; i++) {
+      for (int j = 0; j < m+1; j++) {
+        mpz_class tmpu, tmpw;
+        for (int k = 0; k < shift; k++) {
+          mpz_class tmp(k+1);          
+          mpz_class sa = G[i * shift + k].sample();
+          tmpu = tmpu + sa;
+          tmpw = tmpw + tmp * sa;
+        }
+        u[i * (m+1) + j] = tmpu % gmp_P;
+        w[i * (m+1) + j] = tmpw % gmp_P;
+      }
+    }
+    
+    for (int i = 1; i < softspoken_rep; i++) {
+      for (int j = 0; j < m+1; j++) {
+        mpz_class diff = (u[i * (m+1) + j] + gmp_P - u[j]) % gmp_P;
+        std::vector<uint8_t> ext(48);
+        hex_decompose(diff, &ext[0]);
+        io->send_data(&ext[0], 48);
+      }
+      io->flush();
+    }
+
+    block prg_seed;
+    io->recv_data(&prg_seed, sizeof(block));
+    GMP_PRG_FP pprg(&prg_seed);
+
+    std::vector<mpz_class> coeff_ch(m);
+    for (int i = 0; i < m; i++) coeff_ch[i] = pprg.sample();
+
+    // adding consistancy check
+    mpz_class check_u = u[m];    
+    for (int i = 0; i < m; i++) {
+      check_u = (check_u + u[i] * coeff_ch[i]) % gmp_P;
+    }
+    std::vector<uint8_t> ext(48);
+    hex_decompose(check_u, &ext[0]);
+    io->send_data(&ext[0], 48);
+    for (int i = 0; i < softspoken_rep; i++) {
+      mpz_class check_w = w[i * (m+1) + m];
+      for (int j = 0; j < m; j++) {
+        check_w = (check_w + w[i * (m+1) + j] * coeff_ch[j]) % gmp_P;
+      }
+      std::vector<uint8_t> ext1(48);
+      hex_decompose(check_w, &ext1[0]);
+      io->send_data(&ext1[0], 48);
+    }
+    io->flush();
+
+    std::vector<mpz_class> coeff(softspoken_rep);
+    for (int i = 0; i < softspoken_rep; i++) coeff[i] = pprg.sample();
+    U.resize(m); W.resize(m);
+
+    for (int i = 0; i < m; i++) {
+      mpz_class acc_w;
+      for (int j = 0; j < softspoken_rep; j++) {
+        acc_w = (acc_w + w[j * (m+1) + i] * coeff[j]) % gmp_P;
+      }      
+      U[i] = u[i];
+      W[i] = acc_w;
+    }
+    
+  }
+
+  void receiver_prepare_mali(int m, osuCrypto::Socket &sock) {
+    cur = 0;
+
+    osuCrypto::BitVector choices(softspoken_t * softspoken_rep + 128);
+    osuCrypto::AlignedUnVector<osuCrypto::block> rMsgs(softspoken_t * softspoken_rep + 128);
+    OTExtTypeReceiver receiver;
+    osuCrypto::PRNG prng(osuCrypto::sysRandomSeed());
+
+    receiver.setBaseOts(saved_sMsgs);
+
+    // OT extension
+    choices.randomize(prng);
+    coproto::sync_wait(receiver.receive(choices, rMsgs, prng, sock));
+    coproto::sync_wait(sock.flush());       
+
+    // saving OT for the other direction extension
+    for (int i = 0; i < 128; i++) {
+      saved_choices[i] = choices[softspoken_t * softspoken_rep + i];
+      saved_rMsgs[i] = rMsgs[softspoken_t * softspoken_rep + i];
+    }
+
+    // preparing VOLEs
+    SVOLE_GGM ggm(party, io, softspoken_t); 
+    std::vector<int> punch(softspoken_rep);  
+
+    int shift = 1 << softspoken_t;  
+
+    std::vector<GMP_PRG_FP> G(softspoken_rep * shift);
+    std::vector<block> seed;
+    for (int i = 0; i < softspoken_rep; i++) {
+      ggm.ggm_recv(rMsgs, choices, i*softspoken_t, seed, punch[i]);
+      for (int j = 0; j < shift; j++)
+        G[i * shift + j].reseed(&seed[j]);
+    }    
+
+    std::vector<mpz_class> v(softspoken_rep * (m+1));
+    for (int i = 0; i < softspoken_rep; i++) {
+      for (int j = 0; j < m+1; j++) {
+        mpz_class tmpv;
+        for (int k = 0; k < shift; k++) {
+          if (k == punch[i]) continue;
+          mpz_class tmp(k-punch[i]);
+          tmp = (tmp + gmp_P) % gmp_P;
+          tmpv = tmpv + tmp * G[i * shift + k].sample();
+        }
+        v[i * (m+1) + j] = tmpv % gmp_P;
+      }
+    }
+
+    std::vector<uint8_t> ext(48);
+    for (int i = 1; i < softspoken_rep; i++) {
+      for (int j = 0; j < m+1; j++) {
+        io->recv_data(&ext[0], 48);
+        v[i * (m+1) + j] += hex_compose(&ext[0]) * (punch[i]+1);
+        v[i * (m+1) + j] %= gmp_P;
+      }
+    }    
+
+    PRG prg;
+    block prg_seed;
+    prg.random_block(&prg_seed);
+    io->send_data(&prg_seed, sizeof(block));
+    io->flush();
+
+    GMP_PRG_FP pprg(&prg_seed);
+
+    // adding consistancy check
+
+    std::vector<mpz_class> coeff_ch(m);
+    for (int i = 0; i < m; i++) coeff_ch[i] = pprg.sample();
+    
+    io->recv_data(&ext[0], 48);
+    mpz_class check_u = hex_compose(&ext[0]);    
+    check_u = gmp_P - check_u;
+    for (int i = 0; i < softspoken_rep; i++) {
+      io->recv_data(&ext[0], 48);
+      mpz_class check_w = hex_compose(&ext[0]); 
+      mpz_class check_v = v[i * (m+1) + m];
+      for (int j = 0; j < m; j++) {
+        check_v = (check_v + v[i * (m+1) + j] * coeff_ch[j]) % gmp_P;
+      }
+      mpz_class check = (check_u * (punch[i] + 1) + check_w) % gmp_P;
+      if (check != check_v) {
+        std::cout << "CHEAT at " << i << std::endl;
+        exit(-1);
+      }
+    }
+
+    std::vector<mpz_class> coeff(softspoken_rep);
+    for (int i = 0; i < softspoken_rep; i++) coeff[i] = pprg.sample();
+
+    V.resize(m);
+
+    for (int i = 0; i < m; i++) {
+      mpz_class acc_v;
+      for (int j = 0; j < softspoken_rep; j++) {
+        acc_v = (acc_v + v[j * (m+1) + i] * coeff[j]) % gmp_P;
+      }      
+      V[i] = acc_v;
+    }
+    for (int i = 0; i < softspoken_rep; i++) 
+      Delta = (Delta + coeff[i] * (punch[i]+1)) % gmp_P;
+
+  }
+
   void sender_prepare(int m, osuCrypto::Socket &sock) {
     cur = 0;
 

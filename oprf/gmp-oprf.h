@@ -25,7 +25,8 @@ public:
 
   std::unique_ptr<OprfBaseVole<IO>> basevole = nullptr;
   std::unique_ptr<OprfBaseVole<IO>> basezkvole = nullptr;
-  std::unique_ptr<SoftSpokenOprfBaseVole<IO>> basezkvole2 = nullptr;
+  std::unique_ptr<SoftSpokenOprfBaseVole<IO>> basevole2 = nullptr;
+  std::unique_ptr<SoftSpokenOprfBaseVole<IO>> basezkvole2 = nullptr;  
 
   mpz_class mac_oprf_key;
   std::vector<mpz_class> oprf_mac, oprf_a;
@@ -90,6 +91,41 @@ public:
       basevole = std::make_unique<OprfBaseVole<IO>>(party, ios[0], sock, false);
     }
   }
+
+  // setup with libOTe and BaseVole
+  void setup_base(mpz_class &delta, osuCrypto::Socket &sock, const bool mali) {
+
+    if (party == ALICE) {
+      basevole2 = std::make_unique<SoftSpokenOprfBaseVole<IO>>(party, ios[0]);
+
+      BaseOTType bot;
+      osuCrypto::PRNG prng(osuCrypto::sysRandomSeed());
+
+      // setup base OTs
+      coproto::sync_wait(bot.send(saved_sMsgs, prng, sock));
+      coproto::sync_wait(sock.flush());
+
+      if (mali) basevole2->receiver_prepare_mali(2, sock);
+      else basevole2->receiver_prepare(1, sock);
+
+      this->Delta = basevole2->Delta;
+      delta = this->Delta;
+    } else {
+      basevole2 = std::make_unique<SoftSpokenOprfBaseVole<IO>>(party, ios[0]);
+
+      BaseOTType bot;
+      osuCrypto::PRNG prng(osuCrypto::sysRandomSeed());
+
+      // setup base OTs
+      saved_choices.randomize(prng);
+      coproto::sync_wait(bot.receive(saved_choices, saved_rMsgs, prng, sock));
+      coproto::sync_wait(sock.flush());
+
+      if (mali) basevole2->sender_prepare_mali(2, sock);
+      else basevole2->sender_prepare(1, sock);
+    }
+
+  }  
 
   // setup the inverse direction vole for zk
   // ask the server to commit to the oprf key Delta
@@ -708,7 +744,8 @@ public:
     // for testing VOLE hybrid
     if (party == ALICE) {
       tmp_r.resize(sz+1);
-      basevole->triple_gen_send(oprf_mac, sz+1);
+      //basevole->triple_gen_send(oprf_mac, sz+1);
+      basevole2->triple_gen_send(oprf_mac, sz+1);
       //basezkvole->triple_gen_recv(zk_mac, tmp_r, sz+1);
       basezkvole2->triple_gen_recv(zk_mac, tmp_r, sz+1);
       r.resize(sz * (inter_cnt + 1));
@@ -722,7 +759,8 @@ public:
       std::cout << 1+sz+1+sz*(inter_cnt + 1)+coeff_cnt-1 << std::endl;
     } else {
       oprf_a.resize(sz+1); // only client needs to resize the "blinding" a's
-      basevole->triple_gen_recv(oprf_mac, oprf_a, sz+1);
+      //basevole->triple_gen_recv(oprf_mac, oprf_a, sz+1);
+      basevole2->triple_gen_recv(oprf_mac, oprf_a, sz+1);
       //basezkvole->triple_gen_send(zk_mac, sz+1);
       basezkvole2->triple_gen_send(zk_mac, sz+1);
       r_mac.resize(sz * (inter_cnt + 1));
@@ -1204,7 +1242,8 @@ public:
     std::vector<uint8_t> ext(48 * sz);
     std::vector<mpz_class> share(sz);
     //vole.extend_sender(sock, &share[0], sz);
-    basevole->triple_gen_send(share, sz);
+    //basevole->triple_gen_send(share, sz);
+    basevole2->triple_gen_send(share, sz);
     std::cout << "VOLE generations:" << std::endl;
     std::cout << "communication (B): " << com_test(ios)-com_main << std::endl;
     std::cout << "comm. libOT (B): " << sock.bytesReceived()+sock.bytesSent() << std::endl;     
@@ -1442,7 +1481,8 @@ public:
     y.resize(sz);
     std::vector<mpz_class> share(sz), a(sz);
     //vole.extend_recver(sock, &share[0], &a[0], sz);
-    basevole->triple_gen_recv(share, a, sz);
+    //basevole->triple_gen_recv(share, a, sz);
+    basevole2->triple_gen_recv(share, a, sz);
     std::cout << "VOLE generations:" << std::endl;
     std::cout << "communication (B): " << com_test(ios)-com_main << std::endl;
     std::cout << "comm. libOT (B): " << sock.bytesReceived()+sock.bytesSent() << std::endl; 

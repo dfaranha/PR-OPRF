@@ -29,6 +29,8 @@ int main(int argc, char **argv) {
     sock = osuCrypto::cp::asioConnect(string(argv[3])+":"+string(argv[2]), false);
   }     
 
+  std::cout << "comm. libOT init (B): " << sock.bytesReceived()+sock.bytesSent() << std::endl; 
+
   std::cout << std::endl
             << "------------ TEST SEMI-HONEST OPRF ------------"
             << std::endl
@@ -51,7 +53,9 @@ int main(int argc, char **argv) {
 
     auto start = clock_start();
 
-    oprf.setup_base(delta, sock); 
+    //oprf.setup_base(delta, sock); 
+    oprf.setup_base(delta, sock, false); 
+
     //oprf.oprf_eval_server();   
     oprf.oprf_batch_eval_server_base(test_nn, sock);
 
@@ -74,7 +78,9 @@ int main(int argc, char **argv) {
 
     auto start = clock_start();
 
-    oprf.setup_base(tmptmp, sock);
+    //oprf.setup_base(tmptmp, sock);
+    oprf.setup_base(tmptmp, sock, false);
+
     std::vector<mpz_class> in(test_nn);
     for (int i = 0; i < test_nn; i++) in[i] = i;
     std::vector<mpz_class> out(test_nn);
