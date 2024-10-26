@@ -1,4 +1,5 @@
 #define ENABLE_MALICIOUS // we have to do this to ahieve half-malicious
+#define ENABLE_SS // enable SS VOLE
 
 #include <gmpxx.h>
 #include <iostream>
@@ -51,7 +52,12 @@ int main(int argc, char **argv) {
 
     auto start = clock_start();
 
+#ifdef ENABLE_SS
     oprf.setup_base(delta, sock, true); 
+#else
+    oprf.setup_base(delta, sock); 
+#endif
+
     //oprf.oprf_eval_server();   
     oprf.setup_malicious_base(sock);
     oprf.oprf_batch_eval_server_base(test_nn, sock);
@@ -75,7 +81,12 @@ int main(int argc, char **argv) {
 
     auto start = clock_start();
 
+#ifdef ENABLE_SS
     oprf.setup_base(tmptmp, sock, true);
+#else
+    oprf.setup_base(tmptmp, sock);
+#endif
+
     oprf.setup_malicious_base(sock);
     std::vector<mpz_class> in(test_nn);
     for (int i = 0; i < test_nn; i++) in[i] = i;

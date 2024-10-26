@@ -186,12 +186,14 @@ public:
       std::vector<mpz_class> x(1);
       std::vector<mpz_class> w(1);
 
-      // basezkvole = std::make_unique<OprfBaseVole<IO>>(3-party, ios[0], sock, true);
-      // basezkvole->triple_gen_recv(w, x, 1);
-
+#ifdef ENABLE_SS
       basezkvole2 = std::make_unique<SoftSpokenOprfBaseVole<IO>>(3-party, ios[0]);
       basezkvole2->sender_prepare(desired_size, sock);
       basezkvole2->triple_gen_recv(w, x, 1);
+#else
+      basezkvole = std::make_unique<OprfBaseVole<IO>>(3-party, ios[0], sock, true);
+      basezkvole->triple_gen_recv(w, x, 1);
+#endif
 
       mac_oprf_key = w[0];
       std::vector<uint8_t> ext(48);
@@ -202,14 +204,16 @@ public:
     } else {
       std::vector<mpz_class> v(1);
 
-      // basezkvole = std::make_unique<OprfBaseVole<IO>>(3-party, ios[0], zkDelta, sock, true);
-      // basezkvole->triple_gen_send(v, 1);
-      // cout << v[0] << ' ' << basezkvole->Delta << endl;
-
+#ifdef ENABLE_SS
       basezkvole2 = std::make_unique<SoftSpokenOprfBaseVole<IO>>(3-party, ios[0]);
       basezkvole2->receiver_prepare(desired_size, sock);
       basezkvole2->triple_gen_send(v, 1);   
       zkDelta = basezkvole2->Delta;   
+#else
+      basezkvole = std::make_unique<OprfBaseVole<IO>>(3-party, ios[0], zkDelta, sock, true);
+      basezkvole->triple_gen_send(v, 1);
+#endif
+
 
       mac_oprf_key = v[0];
       std::vector<uint8_t> ext(48);
@@ -744,31 +748,60 @@ public:
     // for testing VOLE hybrid
     if (party == ALICE) {
       tmp_r.resize(sz+1);
-      //basevole->triple_gen_send(oprf_mac, sz+1);
+
+#ifdef ENABLE_SS
       basevole2->triple_gen_send(oprf_mac, sz+1);
-      //basezkvole->triple_gen_recv(zk_mac, tmp_r, sz+1);
       basezkvole2->triple_gen_recv(zk_mac, tmp_r, sz+1);
+#else
+      basevole->triple_gen_send(oprf_mac, sz+1);
+      basezkvole->triple_gen_recv(zk_mac, tmp_r, sz+1);
+#endif
+
       r.resize(sz * (inter_cnt + 1));
       r_mac.resize(sz * (inter_cnt + 1));
-      //basezkvole->triple_gen_recv(r_mac, r, sz * (inter_cnt + 1));
+
+#ifdef ENABLE_SS      
       basezkvole2->triple_gen_recv(r_mac, r, sz * (inter_cnt + 1));
+#else
+      basezkvole->triple_gen_recv(r_mac, r, sz * (inter_cnt + 1));
+#endif
+
       otp_mac.resize(coeff_cnt-1);
       otp.resize(coeff_cnt-1);      
-      //basezkvole->triple_gen_recv(otp_mac, otp, coeff_cnt-1);
+
+#ifdef ENABLE_SS      
       basezkvole2->triple_gen_recv(otp_mac, otp, coeff_cnt-1);
-      std::cout << 1+sz+1+sz*(inter_cnt + 1)+coeff_cnt-1 << std::endl;
+#else
+      basezkvole->triple_gen_recv(otp_mac, otp, coeff_cnt-1);
+#endif
+      
     } else {
       oprf_a.resize(sz+1); // only client needs to resize the "blinding" a's
-      //basevole->triple_gen_recv(oprf_mac, oprf_a, sz+1);
-      basevole2->triple_gen_recv(oprf_mac, oprf_a, sz+1);
-      //basezkvole->triple_gen_send(zk_mac, sz+1);
+
+#ifdef ENABLE_SS      
+      basevole2->triple_gen_recv(oprf_mac, oprf_a, sz+1);      
       basezkvole2->triple_gen_send(zk_mac, sz+1);
+#else
+      basevole->triple_gen_recv(oprf_mac, oprf_a, sz+1);
+      basezkvole->triple_gen_send(zk_mac, sz+1);
+#endif
+
       r_mac.resize(sz * (inter_cnt + 1));
-      //basezkvole->triple_gen_send(r_mac, sz * (inter_cnt + 1));
+
+#ifdef ENABLE_SS      
       basezkvole2->triple_gen_send(r_mac, sz * (inter_cnt + 1));
+#else
+      basezkvole->triple_gen_send(r_mac, sz * (inter_cnt + 1));
+#endif
+
       otp_mac.resize(coeff_cnt-1);
-      //basezkvole->triple_gen_send(otp_mac, coeff_cnt-1);
+
+#ifdef ENABLE_SS      
       basezkvole2->triple_gen_send(otp_mac, coeff_cnt-1);
+#else
+      basezkvole->triple_gen_send(otp_mac, coeff_cnt-1);
+#endif
+
     } 
 
     std::cout << "VOLE generations:" << std::endl;
@@ -1144,8 +1177,13 @@ public:
     // final zk padding
     std::vector<mpz_class> pad1(1);
     std::vector<mpz_class> pad0(1);
-    //basezkvole2->triple_gen_recv(pad0, pad1, 1);    
+    
+#ifdef ENABLE_SS    
     basezkvole2->triple_gen_recv(pad0, pad1, 1);    
+#else    
+    basezkvole->triple_gen_recv(pad0, pad1, 1);    
+#endif
+
     if (cur + sz > alpha.size()) malicious_offline_base(sz, sock); // TODO: we can first use-up all the leftover correlations than extend
     std::vector<uint8_t> ext(48 * sz);
     io->recv_data(&ext[0], 48 * sz);
@@ -1241,9 +1279,13 @@ public:
     }
     std::vector<uint8_t> ext(48 * sz);
     std::vector<mpz_class> share(sz);
-    //vole.extend_sender(sock, &share[0], sz);
-    //basevole->triple_gen_send(share, sz);
+
+#ifdef ENABLE_SS    
     basevole2->triple_gen_send(share, sz);
+#else
+    basevole->triple_gen_send(share, sz);
+#endif
+
     std::cout << "VOLE generations:" << std::endl;
     std::cout << "communication (B): " << com_test(ios)-com_main << std::endl;
     std::cout << "comm. libOT (B): " << sock.bytesReceived()+sock.bytesSent() << std::endl;     
@@ -1371,8 +1413,13 @@ public:
   // base single
   void oprf_batch_eval_client_malicious_base(const mpz_class *x, const int &sz, std::vector<mpz_class> &y, osuCrypto::Socket &sock) {
     std::vector<mpz_class> pad(1);    
-    //basezkvole->triple_gen_send(pad, 1);    
+    
+#ifdef ENABLE_SS
     basezkvole2->triple_gen_send(pad, 1);    
+#else
+    basezkvole->triple_gen_send(pad, 1);    
+#endif
+
     if (cur + sz > alpha.size()) malicious_offline_base(sz, sock); // TODO: we can first use-up all the leftover correlations than extend
     std::vector<uint8_t> ext(48 * sz);
     y.resize(sz);
@@ -1480,9 +1527,13 @@ public:
     std::vector<uint8_t> ext(48 * sz);
     y.resize(sz);
     std::vector<mpz_class> share(sz), a(sz);
-    //vole.extend_recver(sock, &share[0], &a[0], sz);
-    //basevole->triple_gen_recv(share, a, sz);
+
+#ifdef ENABLE_SS
     basevole2->triple_gen_recv(share, a, sz);
+#else
+    basevole->triple_gen_recv(share, a, sz);
+#endif
+    
     std::cout << "VOLE generations:" << std::endl;
     std::cout << "communication (B): " << com_test(ios)-com_main << std::endl;
     std::cout << "comm. libOT (B): " << sock.bytesReceived()+sock.bytesSent() << std::endl; 
