@@ -1245,15 +1245,11 @@ public:
     io->send_data(&ext[0], 48 * sz);
     io->flush();
     // TODO: add ZK to prevent malicious bahaviors
-    io->recv_data(&ext[0], 48);
-    mpz_class chi = hex_compose(&ext[0]);
-    mpz_class powchi = 1;
     mpz_class C1, C0; // two coefficients as the proof
     for (int i = 0; i < sz; i++) {
       int now = cur + i;
-      C1 = (C1 + powchi * (msg1[i] + gmp_P - oprf_mac[now]) * alpha_mac[now] + powchi * (gmp_P - alpha[now]) * zk_mac[now] ) % gmp_P;
-      C0 = (C0 + powchi * zk_mac[now] * alpha_mac[now]) % gmp_P;
-      powchi = (powchi * chi) % gmp_P;
+      C1 = (C1 + (msg1[i] + gmp_P - oprf_mac[now]) * alpha_mac[now] + (gmp_P - alpha[now]) * zk_mac[now] ) % gmp_P;
+      C0 = (C0 + zk_mac[now] * alpha_mac[now]) % gmp_P;
     }
 
     C1 = (C1 + gmp_P - pad1[0]) % gmp_P;
@@ -1524,11 +1520,6 @@ public:
     io->flush();
     io->recv_data(&ext[0], 48 * sz);
     // send the random challenge after committing
-    mpz_class chi = GMP_PRG_FP().sample();
-    std::vector<uint8_t> hex_chi(48);
-    hex_decompose(chi, &hex_chi[0]);
-    io->send_data(&hex_chi[0], 48);
-    io->flush();
 
     std::vector<mpz_class> msg2(sz);
     for (int i = 0; i < sz; i++) {
@@ -1538,12 +1529,10 @@ public:
     // TODO: zkp for malicious behaviors
 
     mpz_class sq_zk_delta = zkDelta * zkDelta % gmp_P;
-    mpz_class powchi = 1;
     mpz_class expect_pi = 0;
     for (int i = 0; i < sz; i++) {
       int now = cur + i;
-      expect_pi = (expect_pi + powchi * ((zk_mac[now] + msg1[i] * zkDelta) * alpha_mac[now] + msg2[i] * sq_zk_delta)) % gmp_P;
-      powchi = powchi * chi % gmp_P;
+      expect_pi = (expect_pi + ((zk_mac[now] + msg1[i] * zkDelta) * alpha_mac[now] + msg2[i] * sq_zk_delta)) % gmp_P;
     }
     expect_pi = (expect_pi + pad[0]) % gmp_P;
     //cout << expect_pi << endl;
