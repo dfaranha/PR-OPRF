@@ -318,7 +318,9 @@ public:
       }      
     }
 
+#ifdef ENABLE_INFO
     cout << "shares committed!" << endl;
+#endif 
 
     // this comment code is used to check the correctness of committed shares
     // cout << "correctness checking..." << endl;
@@ -464,7 +466,9 @@ public:
         std::cout << "The server is cheating in the offline phase to prepare the e-th residues!" << std::endl;
         abort();
       }
+#ifdef ENABLE_INFO
       std::cout << "e-th residues prepared!" << std::endl;
+#endif
 
       // extract out the desired values
       alpha_mac.resize(sz);
@@ -474,7 +478,9 @@ public:
 
     }
 
+#ifdef ENABLE_INFO
     cout << zkvole.ot_limit << ' ' << zkvole.ot_used << endl;
+#endif
 
   }
 
@@ -575,7 +581,9 @@ public:
       }      
     }
 
+#ifdef ENABLE_INFO
     cout << "shares committed!" << endl;
+#endif
 
     // this comment code is used to check the correctness of committed shares
     // cout << "correctness checking..." << endl;
@@ -721,7 +729,9 @@ public:
         std::cout << "The server is cheating in the offline phase to prepare the e-th residues!" << std::endl;
         abort();
       }
+#ifdef ENABLE_INFO
       std::cout << "e-th residues prepared!" << std::endl;
+#endif
 
       // extract out the desired values
       alpha_mac.resize(sz);
@@ -731,7 +741,9 @@ public:
 
     }
 
+#ifdef ENABLE_INFO
     cout << zkvole.ot_limit << ' ' << zkvole.ot_used << endl;
+#endif
 
   }  
 
@@ -804,9 +816,11 @@ public:
 
     } 
 
+#ifdef ENABLE_FINEGRAIN
     std::cout << "VOLE generations:" << std::endl;
     std::cout << "communication (B): " << com_test(ios)-com_main << std::endl;
-    std::cout << "comm. libOT (B): " << sock.bytesReceived()+sock.bytesSent() << std::endl;         
+    std::cout << "comm. libOT (B): " << sock.bytesSent() << std::endl;         
+#endif
 
     if (party == ALICE) {      
       mpz_class mask_oprf_mac;
@@ -909,7 +923,9 @@ public:
       }      
     }
 
+#ifdef ENABLE_INFO
     cout << "shares committed!" << endl;
+#endif
 
     // this comment code is used to check the correctness of committed shares
     // cout << "correctness checking..." << endl;
@@ -1044,7 +1060,9 @@ public:
         std::cout << "The server is cheating in the offline phase to prepare the e-th residues!" << std::endl;
         abort();
       }
+#ifdef ENABLE_INFO      
       std::cout << "e-th residues prepared!" << std::endl;
+#endif
 
       // extract out the desired values
       alpha_mac.resize(sz);
@@ -1054,7 +1072,9 @@ public:
 
     }
 
+#ifdef ENABLE_INFO
     cout << zkvole.ot_limit << ' ' << zkvole.ot_used << endl;
+#endif
 
   }  
 
@@ -1092,7 +1112,19 @@ public:
 
   // batch malicious
   void oprf_batch_eval_server_malicious(const int &sz) {
+
+    // final zk padding
+    mpz_class pad1, pad0;
+    zkvole.extend_recver(&pad0, &pad1, 1);
+
     if (cur + sz > alpha.size()) malicious_offline(sz); // TODO: we can first use-up all the leftover correlations than extend
+
+#ifdef ENABLE_FINEGRAIN
+    std::cout << "Offline point:" << std::endl;
+    std::cout << "communication (B): " << com_test(ios)-com_main << std::endl;
+    std::cout << "comm. libOT (B): " << sock.bytesSent() << std::endl;         
+#endif
+
     std::vector<uint8_t> ext(48 * sz);
     io->recv_data(&ext[0], 48 * sz);
     std::vector<mpz_class> msg1(sz);
@@ -1117,9 +1149,7 @@ public:
       C0 = (C0 + powchi * zk_mac[now] * alpha_mac[now]) % gmp_P;
       powchi = (powchi * chi) % gmp_P;
     }
-    // final zk padding
-    mpz_class pad1, pad0;
-    zkvole.extend_recver(&pad0, &pad1, 1);
+
     C1 = (C1 + gmp_P - pad1) % gmp_P;
     C0 = (C0 + pad0) % gmp_P;
     std::vector<uint8_t> hex_pi(96);
@@ -1133,7 +1163,19 @@ public:
   // batch malicious
   // with libOTe
   void oprf_batch_eval_server_malicious(const int &sz, osuCrypto::Socket &sock) {
+
+    // final zk padding
+    mpz_class pad1, pad0;
+    zkvole.extend_recver(sock, &pad0, &pad1, 1);
+
     if (cur + sz > alpha.size()) malicious_offline(sz, sock); // TODO: we can first use-up all the leftover correlations than extend
+
+#ifdef ENABLE_FINEGRAIN
+    std::cout << "Offline point:" << std::endl;
+    std::cout << "communication (B): " << com_test(ios)-com_main << std::endl;
+    std::cout << "comm. libOT (B): " << sock.bytesSent() << std::endl;         
+#endif
+
     std::vector<uint8_t> ext(48 * sz);
     io->recv_data(&ext[0], 48 * sz);
     std::vector<mpz_class> msg1(sz);
@@ -1158,9 +1200,7 @@ public:
       C0 = (C0 + powchi * zk_mac[now] * alpha_mac[now]) % gmp_P;
       powchi = (powchi * chi) % gmp_P;
     }
-    // final zk padding
-    mpz_class pad1, pad0;
-    zkvole.extend_recver(sock, &pad0, &pad1, 1);
+
     C1 = (C1 + gmp_P - pad1) % gmp_P;
     C0 = (C0 + pad0) % gmp_P;
     std::vector<uint8_t> hex_pi(96);
@@ -1185,6 +1225,13 @@ public:
 #endif
 
     if (cur + sz > alpha.size()) malicious_offline_base(sz, sock); // TODO: we can first use-up all the leftover correlations than extend
+
+#ifdef ENABLE_FINEGRAIN
+    std::cout << "Offline point:" << std::endl;
+    std::cout << "communication (B): " << com_test(ios)-com_main << std::endl;
+    std::cout << "comm. libOT (B): " << sock.bytesSent() << std::endl;         
+#endif
+
     std::vector<uint8_t> ext(48 * sz);
     io->recv_data(&ext[0], 48 * sz);
     std::vector<mpz_class> msg1(sz);
@@ -1229,6 +1276,14 @@ public:
     std::vector<uint8_t> ext(48 * sz);
     std::vector<mpz_class> share(sz);
     vole.extend_sender(&share[0], sz);
+
+
+#ifdef ENABLE_FINEGRAIN    
+    std::cout << "VOLE generations:" << std::endl;
+    std::cout << "communication (B): " << com_test(ios)-com_main << std::endl;
+    std::cout << "comm. libOT (B): " << sock.bytesSent() << std::endl; 
+#endif
+
     io->recv_data(&ext[0], 48 * sz);
     mpz_class msg1, msg2, alphae;
     GMP_PRG_FP prg;
@@ -1254,6 +1309,14 @@ public:
     std::vector<uint8_t> ext(48 * sz);
     std::vector<mpz_class> share(sz);
     vole.extend_sender(sock, &share[0], sz);
+
+
+#ifdef ENABLE_FINEGRAIN    
+    std::cout << "VOLE generations:" << std::endl;
+    std::cout << "communication (B): " << com_test(ios)-com_main << std::endl;
+    std::cout << "comm. libOT (B): " << sock.bytesSent() << std::endl; 
+#endif
+
     io->recv_data(&ext[0], 48 * sz);
     mpz_class msg1, msg2, alphae;
     GMP_PRG_FP prg;
@@ -1286,9 +1349,12 @@ public:
     basevole->triple_gen_send(share, sz);
 #endif
 
+#ifdef ENABLE_FINEGRAIN
     std::cout << "VOLE generations:" << std::endl;
     std::cout << "communication (B): " << com_test(ios)-com_main << std::endl;
-    std::cout << "comm. libOT (B): " << sock.bytesReceived()+sock.bytesSent() << std::endl;     
+    std::cout << "comm. libOT (B): " << sock.bytesSent() << std::endl;     
+#endif
+
     io->recv_data(&ext[0], 48 * sz);
     mpz_class msg1, msg2, alphae;
     GMP_PRG_FP prg;
@@ -1307,7 +1373,18 @@ public:
 
 
   void oprf_batch_eval_client_malicious(const mpz_class *x, const int &sz, std::vector<mpz_class> &y) {
+
+    mpz_class pad;
+    zkvole.extend_sender(&pad, 1);
+
     if (cur + sz > alpha.size()) malicious_offline(sz); // TODO: we can first use-up all the leftover correlations than extend
+
+#ifdef ENABLE_FINEGRAIN    
+    std::cout << "Offline point:" << std::endl;
+    std::cout << "communication (B): " << com_test(ios)-com_main << std::endl;
+    std::cout << "comm. libOT (B): " << sock.bytesSent() << std::endl; 
+#endif
+
     std::vector<uint8_t> ext(48 * sz);
     y.resize(sz);
     std::vector<mpz_class> msg1(sz);
@@ -1340,8 +1417,6 @@ public:
       expect_pi = (expect_pi + powchi * ((zk_mac[now] + msg1[i] * zkDelta) * alpha_mac[now] + msg2[i] * sq_zk_delta)) % gmp_P;
       powchi = powchi * chi % gmp_P;
     }
-    mpz_class pad;
-    zkvole.extend_sender(&pad, 1);
     expect_pi = (expect_pi + pad) % gmp_P;
     //cout << expect_pi << endl;
     std::vector<uint8_t> hex_pi(96);
@@ -1353,13 +1428,26 @@ public:
       cout << "The server is cheating in the final opening!" << endl;
       abort();
     }
+#ifdef ENABLE_INFO    
     cout << "opening check pass" << endl;
+#endif
     cur += sz;
   }
 
   // with libOTe
   void oprf_batch_eval_client_malicious(const mpz_class *x, const int &sz, std::vector<mpz_class> &y, osuCrypto::Socket &sock) {
+
+    mpz_class pad;
+    zkvole.extend_sender(sock, &pad, 1);
+
     if (cur + sz > alpha.size()) malicious_offline(sz, sock); // TODO: we can first use-up all the leftover correlations than extend
+
+#ifdef ENABLE_FINEGRAIN    
+    std::cout << "Offline point:" << std::endl;
+    std::cout << "communication (B): " << com_test(ios)-com_main << std::endl;
+    std::cout << "comm. libOT (B): " << sock.bytesSent() << std::endl; 
+#endif
+
     std::vector<uint8_t> ext(48 * sz);
     y.resize(sz);
     std::vector<mpz_class> msg1(sz);
@@ -1392,8 +1480,6 @@ public:
       expect_pi = (expect_pi + powchi * ((zk_mac[now] + msg1[i] * zkDelta) * alpha_mac[now] + msg2[i] * sq_zk_delta)) % gmp_P;
       powchi = powchi * chi % gmp_P;
     }
-    mpz_class pad;
-    zkvole.extend_sender(sock, &pad, 1);
     expect_pi = (expect_pi + pad) % gmp_P;
     //cout << expect_pi << endl;
     std::vector<uint8_t> hex_pi(96);
@@ -1405,7 +1491,9 @@ public:
       cout << "The server is cheating in the final opening!" << endl;
       abort();
     }
+#ifdef ENABLE_INFO    
     cout << "opening check pass" << endl;
+#endif
     cur += sz;
   }  
 
@@ -1421,6 +1509,13 @@ public:
 #endif
 
     if (cur + sz > alpha.size()) malicious_offline_base(sz, sock); // TODO: we can first use-up all the leftover correlations than extend
+
+#ifdef ENABLE_FINEGRAIN    
+    std::cout << "Offline point:" << std::endl;
+    std::cout << "communication (B): " << com_test(ios)-com_main << std::endl;
+    std::cout << "comm. libOT (B): " << sock.bytesSent() << std::endl; 
+#endif
+
     std::vector<uint8_t> ext(48 * sz);
     y.resize(sz);
     std::vector<mpz_class> msg1(sz);
@@ -1464,7 +1559,9 @@ public:
       cout << "The server is cheating in the final opening!" << endl;
       abort();
     }
+#ifdef ENABLE_INFO    
     cout << "opening check pass" << endl;
+#endif
     cur += sz;
   }  
 
@@ -1477,6 +1574,13 @@ public:
     y.resize(sz);
     std::vector<mpz_class> share(sz), a(sz);
     vole.extend_recver(&share[0], &a[0], sz);
+
+#ifdef ENABLE_FINEGRAIN    
+    std::cout << "VOLE generation:" << std::endl;
+    std::cout << "communication (B): " << com_test(ios)-com_main << std::endl;
+    std::cout << "comm. libOT (B): " << sock.bytesSent() << std::endl; 
+#endif
+
     mpz_class msg1;
     for (int i = 0; i < sz; i++) {
       msg1 = (a[i] * x[i] + share[i]) % gmp_P;
@@ -1502,6 +1606,13 @@ public:
     y.resize(sz);
     std::vector<mpz_class> share(sz), a(sz);
     vole.extend_recver(sock, &share[0], &a[0], sz);
+
+#ifdef ENABLE_FINEGRAIN    
+    std::cout << "VOLE generation:" << std::endl;
+    std::cout << "communication (B): " << com_test(ios)-com_main << std::endl;
+    std::cout << "comm. libOT (B): " << sock.bytesSent() << std::endl; 
+#endif
+
     mpz_class msg1;
     for (int i = 0; i < sz; i++) {
       msg1 = (a[i] * x[i] + share[i]) % gmp_P;
@@ -1533,10 +1644,13 @@ public:
 #else
     basevole->triple_gen_recv(share, a, sz);
 #endif
-    
+
+#ifdef ENABLE_FINEGRAIN    
     std::cout << "VOLE generations:" << std::endl;
     std::cout << "communication (B): " << com_test(ios)-com_main << std::endl;
-    std::cout << "comm. libOT (B): " << sock.bytesReceived()+sock.bytesSent() << std::endl; 
+    std::cout << "comm. libOT (B): " << sock.bytesSent() << std::endl; 
+#endif
+
     mpz_class msg1;
     for (int i = 0; i < sz; i++) {
       msg1 = (a[i] * x[i] + share[i]) % gmp_P;

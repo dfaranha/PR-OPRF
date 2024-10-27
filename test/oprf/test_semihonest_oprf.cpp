@@ -24,7 +24,7 @@ int main(int argc, char **argv) {
 
   osuCrypto::Socket sock;
   if (party == ALICE) {
-    sock = osuCrypto::cp::asioConnect("127.0.0.1:"+string(argv[2]), true);
+    sock = osuCrypto::cp::asioConnect(string(argv[3])+":"+string(argv[2]), true);
   } else {
     sock = osuCrypto::cp::asioConnect(string(argv[3])+":"+string(argv[2]), false);
   }             
@@ -57,10 +57,8 @@ int main(int argc, char **argv) {
     double ttt = time_from(start);
     std::cout << "oprf eval: " << ttt << " us" << std::endl; 
     uint64_t com2 = comm(ios) - com1;
-    uint64_t com22 = comm2(ios) - com11;
     std::cout << "communication (B): " << com2 << std::endl;
-    std::cout << "communication (B): " << com22 << std::endl;
-    std::cout << "comm. libOT (B): " << sock.bytesReceived()+sock.bytesSent() << std::endl; 
+    std::cout << "comm. libOT (B): " << sock.bytesSent() << std::endl; 
 
     std::cout << "correctness checking..." << std::endl;
     std::vector<uint8_t> ext(48);
@@ -82,10 +80,8 @@ int main(int argc, char **argv) {
     double ttt = time_from(start);
     std::cout << "oprf eval: " << ttt << " us" << std::endl;    
     uint64_t com2 = comm(ios) - com1;
-    uint64_t com22 = comm2(ios) - com11;
     std::cout << "communication (B): " << com2 << std::endl;
-    std::cout << "communication (B): " << com22 << std::endl;
-    std::cout << "comm. libOT (B): " << sock.bytesReceived()+sock.bytesSent() << std::endl; 
+    std::cout << "comm. libOT (B): " << sock.bytesSent() << std::endl; 
 
     std::cout << "correctness checking..." << std::endl;
     std::vector<uint8_t> ext(48);
