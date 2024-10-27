@@ -1122,7 +1122,6 @@ public:
 #ifdef ENABLE_FINEGRAIN
     std::cout << "Offline point:" << std::endl;
     std::cout << "communication (B): " << com_test(ios)-com_main << std::endl;
-    std::cout << "comm. libOT (B): " << sock.bytesSent() << std::endl;         
 #endif
 
     std::vector<uint8_t> ext(48 * sz);
@@ -1281,7 +1280,6 @@ public:
 #ifdef ENABLE_FINEGRAIN    
     std::cout << "VOLE generations:" << std::endl;
     std::cout << "communication (B): " << com_test(ios)-com_main << std::endl;
-    std::cout << "comm. libOT (B): " << sock.bytesSent() << std::endl; 
 #endif
 
     io->recv_data(&ext[0], 48 * sz);
@@ -1382,7 +1380,6 @@ public:
 #ifdef ENABLE_FINEGRAIN    
     std::cout << "Offline point:" << std::endl;
     std::cout << "communication (B): " << com_test(ios)-com_main << std::endl;
-    std::cout << "comm. libOT (B): " << sock.bytesSent() << std::endl; 
 #endif
 
     std::vector<uint8_t> ext(48 * sz);
@@ -1578,7 +1575,6 @@ public:
 #ifdef ENABLE_FINEGRAIN    
     std::cout << "VOLE generation:" << std::endl;
     std::cout << "communication (B): " << com_test(ios)-com_main << std::endl;
-    std::cout << "comm. libOT (B): " << sock.bytesSent() << std::endl; 
 #endif
 
     mpz_class msg1;
