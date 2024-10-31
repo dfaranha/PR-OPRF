@@ -30,7 +30,7 @@ int main(int argc, char **argv) {
   }             
 
   std::cout << std::endl
-            << "------------ TEST SEMI-HONEST OPRF ------------"
+            << "------------ TEST MULTI-POINT SEMI-HONEST OPRF ------------"
             << std::endl
             << std::endl;
 

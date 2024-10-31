@@ -31,12 +31,12 @@ int main(int argc, char **argv) {
 
 
   std::cout << std::endl
-            << "------------ TEST MALICIOUS OPRF ------------"
+            << "------------ TEST MULTI-POINT MALICIOUS OPRF ------------"
             << std::endl
             << std::endl;
 
   // cout << "#VOLE: "; int test_nn = 10005354;
-  int test_nn = 290000; //1000; //290000; //5354;
+  int test_nn = 1000; //290000; //1000; //290000; //5354;
 
   uint64_t com1, com11;
   com1 = comm(ios);

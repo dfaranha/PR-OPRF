@@ -33,7 +33,7 @@ int main(int argc, char **argv) {
   int opt_para = atoi(argv[4]);
 
   std::cout << std::endl
-            << "------------ TEST SEMI-HONEST OPRF ------------"
+            << "------------ TEST OPTIMIZATION PARA ------------"
             << std::endl
             << std::endl;
 

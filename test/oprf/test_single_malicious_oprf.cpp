@@ -1,5 +1,6 @@
 #define ENABLE_MALICIOUS // we have to do this to ahieve half-malicious
 #define ENABLE_SS // enable SS VOLE
+#define ENABLE_FINEGRAIN
 
 #include <gmpxx.h>
 #include <iostream>
@@ -31,7 +32,7 @@ int main(int argc, char **argv) {
   }     
 
   std::cout << std::endl
-            << "------------ TEST SEMI-HONEST OPRF ------------"
+            << "------------ TEST SINGLE-POINT MALICIOUS 2PC-GOLD ------------"
             << std::endl
             << std::endl;
 

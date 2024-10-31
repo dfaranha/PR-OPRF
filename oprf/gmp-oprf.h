@@ -183,42 +183,42 @@ public:
     is_malicious = true;
     auto desired_size = 128/epsilon + (1<<epsilon) + 4;
     if (party == ALICE) {
-      std::vector<mpz_class> x(1);
-      std::vector<mpz_class> w(1);
+      // std::vector<mpz_class> x(1);
+      // std::vector<mpz_class> w(1);
 
 #ifdef ENABLE_SS
       basezkvole2 = std::make_unique<SoftSpokenOprfBaseVole<IO>>(3-party, ios[0]);
       basezkvole2->sender_prepare(desired_size, sock);
-      basezkvole2->triple_gen_recv(w, x, 1);
+      // basezkvole2->triple_gen_recv(w, x, 1);
 #else
       basezkvole = std::make_unique<OprfBaseVole<IO>>(3-party, ios[0], sock, true);
-      basezkvole->triple_gen_recv(w, x, 1);
+      // basezkvole->triple_gen_recv(w, x, 1);
 #endif
 
-      mac_oprf_key = w[0];
-      std::vector<uint8_t> ext(48);
-      x[0] = (Delta + gmp_P - x[0]) % gmp_P;
-      hex_decompose(x[0], &ext[0]);
-      io->send_data(&ext[0], 48);
-      io->flush();
+      // mac_oprf_key = w[0];
+      // std::vector<uint8_t> ext(48);
+      // x[0] = (Delta + gmp_P - x[0]) % gmp_P;
+      // hex_decompose(x[0], &ext[0]);
+      // io->send_data(&ext[0], 48);
+      // io->flush();
     } else {
       std::vector<mpz_class> v(1);
 
 #ifdef ENABLE_SS
       basezkvole2 = std::make_unique<SoftSpokenOprfBaseVole<IO>>(3-party, ios[0]);
       basezkvole2->receiver_prepare(desired_size, sock);
-      basezkvole2->triple_gen_send(v, 1);   
+      // basezkvole2->triple_gen_send(v, 1);   
       zkDelta = basezkvole2->Delta;   
 #else
       basezkvole = std::make_unique<OprfBaseVole<IO>>(3-party, ios[0], zkDelta, sock, true);
-      basezkvole->triple_gen_send(v, 1);
+      //basezkvole->triple_gen_send(v, 1);
 #endif
 
 
-      mac_oprf_key = v[0];
-      std::vector<uint8_t> ext(48);
-      io->recv_data(&ext[0], 48);
-      mac_oprf_key = (mac_oprf_key + (gmp_P - (hex_compose(&ext[0]) * zkDelta % gmp_P))) % gmp_P;
+      //mac_oprf_key = v[0];
+      //std::vector<uint8_t> ext(48);
+      //io->recv_data(&ext[0], 48);
+      //mac_oprf_key = (mac_oprf_key + (gmp_P - (hex_compose(&ext[0]) * zkDelta % gmp_P))) % gmp_P;
     }
   }    
 
@@ -514,15 +514,28 @@ public:
       io->flush();
 
       // universal linear hashing check 
-      io->recv_data(&ext[0], 96);
+      io->recv_data(&ext[0], 48);
       mpz_class chi = hex_compose(&ext[0]);
-      mpz_class acc_oprf_a = hex_compose(&ext[48]);
+
       mpz_class acc_zk_mac = mask_zk_mac;
+      mpz_class my_acc_oprf_mac = mask_oprf_mac;
       mpz_class powchi = chi;
       for (int i = 0; i < sz; i++) {
         acc_zk_mac = (acc_zk_mac + powchi * zk_mac[i]) % gmp_P;
+        my_acc_oprf_mac = (my_acc_oprf_mac + powchi * oprf_mac[i]) % gmp_P;
         powchi = powchi * chi % gmp_P;
       }
+
+      io->recv_data(&ext[0], 96);
+      mpz_class acc_oprf_mac = hex_compose(&ext[0]);
+      mpz_class acc_oprf_a = hex_compose(&ext[48]);
+
+      if ( (((gmp_P - acc_oprf_a) * Delta + acc_oprf_mac) % gmp_P) != my_acc_oprf_mac ) {
+        std::cout << "Client Cheats!" << std::endl;
+        exit(-1);
+      }
+      
+
       mpz_class proof_pi = (acc_zk_mac + acc_oprf_a * mac_oprf_key) % gmp_P;
       //cout << proof_pi << endl;
       for (int i = 0; i < 48; i++) ext[i] = 0;
@@ -551,24 +564,31 @@ public:
 
       // universal linear hashing check
       mpz_class chi = GMP_PRG_FP().sample();
+      for (int i = 0; i < 48; i++) ext[i] = 0;
+      hex_decompose(chi, &ext[0]);
+      io->send_data(&ext[0], 48); io->flush();
+
       std::vector<mpz_class> powchi(sz);
       powchi[0] = chi;
       for (int i = 1; i < sz; i++) powchi[i] = powchi[i-1] * chi % gmp_P;
+
       // several accumulators      
       mpz_class acc_oprf_a = mask_oprf_a;
-      for (int i = 0; i < sz; i++) acc_oprf_a = (acc_oprf_a + oprf_a[i] * powchi[i]) % gmp_P;
+      mpz_class acc_oprf_mac = mask_oprf_mac;
+      for (int i = 0; i < sz; i++) {
+        acc_oprf_a = (acc_oprf_a + oprf_a[i] * powchi[i]) % gmp_P;
+        acc_oprf_mac = (acc_oprf_mac + oprf_mac[i] * powchi[i]) % gmp_P;
+      }
       for (int i = 0; i < 96; i++) ext[i] = 0;
       // TODO: check if it is okay to not send the "MAC" to ensure a correct acc_oprf_a (it should be)
-      hex_decompose(chi, &ext[0]);
+      hex_decompose(acc_oprf_mac, &ext[0]);
       hex_decompose(acc_oprf_a, &ext[48]);
       io->send_data(&ext[0], 96);
       io->flush();
       
-      // delay this computation for better e2e time (i.e., p can start earlier)
-      mpz_class acc_oprf_mac = mask_oprf_mac;
+      // delay this computation for better e2e time (i.e., p can start earlier)      
       mpz_class acc_zk_mac = mask_zk_mac;
       for (int i = 0; i < sz; i++) {
-        acc_oprf_mac = (acc_oprf_mac + oprf_mac[i] * powchi[i]) % gmp_P;
         acc_zk_mac = (acc_zk_mac + zk_mac[i] * powchi[i]) % gmp_P;
       }
 
@@ -814,7 +834,18 @@ public:
       basezkvole->triple_gen_send(otp_mac, coeff_cnt-1);
 #endif
 
-    } 
+    }
+
+    // step to commit the oprf key
+    if (party == ALICE) {
+      std::vector<mpz_class> x(1);
+      std::vector<mpz_class> w(1);
+
+#ifdef ENABLE_SS
+      basezkvole2->triple_gen_recv(w, x, 1);
+#else
+      basezkvole->triple_gen_recv(w, x, 1);
+#endif
 
 #ifdef ENABLE_FINEGRAIN
     std::cout << "VOLE generations:" << std::endl;
@@ -822,6 +853,34 @@ public:
     std::cout << "comm. libOT (B): " << sock.bytesSent() << std::endl;         
 #endif
 
+      mac_oprf_key = w[0];
+      std::vector<uint8_t> ext(48);
+      x[0] = (Delta + gmp_P - x[0]) % gmp_P;
+      hex_decompose(x[0], &ext[0]);
+      io->send_data(&ext[0], 48);
+      io->flush();
+    } else {
+      std::vector<mpz_class> v(1);
+
+#ifdef ENABLE_SS
+      basezkvole2->triple_gen_send(v, 1);   
+#else
+      basezkvole->triple_gen_send(v, 1);
+#endif
+
+#ifdef ENABLE_FINEGRAIN
+    std::cout << "VOLE generations:" << std::endl;
+    std::cout << "communication (B): " << com_test(ios)-com_main << std::endl;
+    std::cout << "comm. libOT (B): " << sock.bytesSent() << std::endl;         
+#endif
+
+      mac_oprf_key = v[0];
+      std::vector<uint8_t> ext(48);
+      io->recv_data(&ext[0], 48);
+      mac_oprf_key = (mac_oprf_key + (gmp_P - (hex_compose(&ext[0]) * zkDelta % gmp_P))) % gmp_P;
+    }     
+
+    // commit v and the consistancy check
     if (party == ALICE) {      
       mpz_class mask_oprf_mac;
       mpz_class mask_zk_mac, mask_tmp_r;
@@ -851,17 +910,29 @@ public:
       io->flush();
 
       // universal linear hashing check 
-      io->recv_data(&ext[0], 96);
+      io->recv_data(&ext[0], 48);
       mpz_class chi = hex_compose(&ext[0]);
-      mpz_class acc_oprf_a = hex_compose(&ext[48]);
+      
       mpz_class acc_zk_mac = mask_zk_mac;
+      mpz_class my_acc_oprf_mac = mask_oprf_mac;
       mpz_class powchi = chi;
       for (int i = 0; i < sz; i++) {
         acc_zk_mac = (acc_zk_mac + powchi * zk_mac[i]) % gmp_P;
+        my_acc_oprf_mac = (my_acc_oprf_mac + powchi * oprf_mac[i]) % gmp_P;
         powchi = powchi * chi % gmp_P;
       }
+
+      io->recv_data(&ext[0], 96);
+      mpz_class acc_oprf_mac = hex_compose(&ext[0]);
+      mpz_class acc_oprf_a = hex_compose(&ext[48]);
       mpz_class proof_pi = (acc_zk_mac + acc_oprf_a * mac_oprf_key) % gmp_P;
       //cout << proof_pi << endl;
+
+      if ( (((gmp_P - acc_oprf_a) * Delta + acc_oprf_mac) % gmp_P) != my_acc_oprf_mac ) {
+        std::cout << "Client cheats!" << std::endl;
+        exit(-1);
+      }
+
       for (int i = 0; i < 48; i++) ext[i] = 0;
       hex_decompose(proof_pi, &ext[0]);
       io->send_data(&ext[0], 48);
@@ -893,24 +964,29 @@ public:
 
       // universal linear hashing check
       mpz_class chi = GMP_PRG_FP().sample();
+      for (int i = 0; i < 48; i++) ext[i] = 0;
+      hex_decompose(chi, &ext[0]);
+      io->send_data(&ext[0], 48); io->flush();
       std::vector<mpz_class> powchi(sz);
       powchi[0] = chi;
       for (int i = 1; i < sz; i++) powchi[i] = powchi[i-1] * chi % gmp_P;
       // several accumulators      
       mpz_class acc_oprf_a = mask_oprf_a;
-      for (int i = 0; i < sz; i++) acc_oprf_a = (acc_oprf_a + oprf_a[i] * powchi[i]) % gmp_P;
+      mpz_class acc_oprf_mac = mask_oprf_mac;
+      for (int i = 0; i < sz; i++) {
+        acc_oprf_a = (acc_oprf_a + oprf_a[i] * powchi[i]) % gmp_P;
+        acc_oprf_mac = (acc_oprf_mac + oprf_mac[i] * powchi[i]) % gmp_P;
+      }
       for (int i = 0; i < 96; i++) ext[i] = 0;
-      // TODO: check if it is okay to not send the "MAC" to ensure a correct acc_oprf_a (it should be)
-      hex_decompose(chi, &ext[0]);
+      // TODO: check if it is okay to not send the "MAC" to ensure a correct acc_oprf_a (it should be)     
+      hex_decompose(acc_oprf_mac, &ext[0]);
       hex_decompose(acc_oprf_a, &ext[48]);
       io->send_data(&ext[0], 96);
       io->flush();
       
       // delay this computation for better e2e time (i.e., p can start earlier)
-      mpz_class acc_oprf_mac = mask_oprf_mac;
       mpz_class acc_zk_mac = mask_zk_mac;
       for (int i = 0; i < sz; i++) {
-        acc_oprf_mac = (acc_oprf_mac + oprf_mac[i] * powchi[i]) % gmp_P;
         acc_zk_mac = (acc_zk_mac + zk_mac[i] * powchi[i]) % gmp_P;
       }
 
