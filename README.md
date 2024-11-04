@@ -3,7 +3,7 @@
 ## Clarification
 
 This repo includes all instructions to re-produce the results in the paper.
-We will include proper LICENSE (potentially, MIT LICENSE) when we make it open-source.
+We will include corresponding LICENSE (potentially, MIT LICENSE) when we make it open-source.
 
 ## Requirements
 
@@ -66,6 +66,17 @@ exe 1 PORT IP phi
 whereas the client can executes
 ```
 exe 2 PORT IP phi
+```
+
+## Example
+
+The server executes
+```
+test_oprf_test_single_malicious_oprf 1 12345 127.0.0.1
+```
+whereas the client executes
+```
+test_oprf_test_single_malicious_oprf 2 12345 127.0.0.1
 ```
 
 ## Macro

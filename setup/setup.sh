@@ -1,3 +1,4 @@
+sudo apt update &&
 sudo apt install libgmp-dev libtool -y &&
 mkdir emp &&
 cd emp &&
