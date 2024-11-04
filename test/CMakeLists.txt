@@ -54,10 +54,12 @@ endmacro()
 # add_test_case_with_run(oprf test_mpfss)
 # add_test_case_with_run(oprf test_lpn)
 # add_test_case_with_run(oprf test_voletriple)
-add_test_case_with_run(oprf test_semihonest_oprf)
-add_test_case_with_run(oprf test_malicious_oprf)
 # add_test_case_with_run(oprf test_pow)
-add_test_case_with_run(oprf test_single_semihoset_oprf)
+
+add_test_case_with_run(oprf test_halfmalicious_oprf)
+add_test_case_with_run(oprf test_malicious_oprf)
+
+add_test_case_with_run(oprf test_single_halfmalicious_oprf)
 add_test_case_with_run(oprf test_single_malicious_oprf)
 
 add_test_case_with_run(oprf test_optimization_para)

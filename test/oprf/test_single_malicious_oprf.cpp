@@ -41,7 +41,7 @@ int main(int argc, char **argv) {
   uint64_t com1, com11;
   com1 = comm(ios);
   com11 = comm2(ios);    
-
+  com_main = com1;
 
   // tmptmp
   if (party == ALICE) {
