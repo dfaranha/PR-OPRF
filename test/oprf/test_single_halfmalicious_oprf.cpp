@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
   }     
 
   std::cout << std::endl
-            << "------------ TEST SINGLE-POINT HALF-MALICIOUS 2PC-GOLD ------------"
+            << "------------ TEST NON-BATCHED HALF-MALICIOUS 2PC-GOLD ------------"
             << std::endl
             << std::endl;
 

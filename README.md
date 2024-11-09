@@ -42,11 +42,11 @@ mkdir build && cd build && cmake ../ && make && cd ..
 
 All executables are located in `build/bin`, including:
 
-* `test_oprf_test_halfmalicious_oprf`: the executable for multi-point half-malicious 2PC-Gold
-* `test_oprf_test_malicious_oprf`: the executable for multi-point malicious 2PC-Gold
-* `test_oprf_test_single_halfmalicious_oprf`: the executable for single-point half-malicious 2PC-Gold
-* `test_oprf_test_single_malicious_oprf`: the executable for single-point malicious 2PC-Gold
-* `test_oprf_test_optimization_para`: the executable for testing optimization parameter phi in single-point malicious 2PC-Gold
+* `test_oprf_test_halfmalicious_oprf`: the executable for batched half-malicious 2PC-Gold
+* `test_oprf_test_malicious_oprf`: the executable for batched malicious 2PC-Gold
+* `test_oprf_test_single_halfmalicious_oprf`: the executable for non-batched half-malicious 2PC-Gold
+* `test_oprf_test_single_malicious_oprf`: the executable for non-batched malicious 2PC-Gold
+* `test_oprf_test_optimization_para`: the executable for testing optimization parameter phi in non-batched malicious 2PC-Gold
 
 ## Usage
 

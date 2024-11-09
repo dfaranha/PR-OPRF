@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
 
 
   std::cout << std::endl
-            << "------------ TEST MULTI-POINT MALICIOUS OPRF ------------"
+            << "------------ TEST BATCHED MALICIOUS 2PC-GOLD ------------"
             << std::endl
             << std::endl;
 
