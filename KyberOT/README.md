@@ -1,0 +1,1 @@
+This directory originates from the following repository: https://github.com/osu-crypto/libOTe/tree/master/thirdparty.

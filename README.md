@@ -2,8 +2,7 @@
 
 ## Clarification
 
-This repo includes all instructions to re-produce the results in the paper.
-We will include corresponding LICENSE (potentially, MIT LICENSE) when we make it open-source.
+This repo includes all instructions to re-produce the results in the paper https://eprint.iacr.org/2024/1955.pdf, which is published at IEEE S&P 2025.
 
 ## Requirements
 
