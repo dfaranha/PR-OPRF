@@ -84,3 +84,4 @@ We list several MACROs that are needed to enable different experiments:
 
 * `ENABLE_PQ`: set to `true` to enable PQ instantiation
 * `ENABLE_FINEGRAIN`: set to `true` to enable fine-grained analysis
+* `ENABLE_SMALLN`: set to `true` to enable smaller n experiments in the batched setting

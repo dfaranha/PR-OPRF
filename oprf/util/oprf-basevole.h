@@ -465,7 +465,6 @@ public:
 
   void sender_prepare(int m, osuCrypto::Socket &sock) {
     cur = 0;
-
     osuCrypto::AlignedUnVector<std::array<osuCrypto::block, 2>> sMsgs(softspoken_t * softspoken_rep);
 
     OTExtTypeSender sender;

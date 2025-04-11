@@ -1,4 +1,5 @@
 #define ENABLE_MALICIOUS // we have to do this to ahieve half-malicious
+//#define ENABLE_SMALLN // for small n testing
 
 #include <gmpxx.h>
 #include <iostream>
@@ -34,8 +35,12 @@ int main(int argc, char **argv) {
             << std::endl
             << std::endl;
 
-  // cout << "#VOLE: "; int test_nn = 10005354;
+  // cout << "#VOLE: "; 
+#ifndef ENABLE_SMALLN  
   int test_nn = 10005354;
+#else
+  int test_nn = 100000;
+#endif
 
   uint64_t com1, com11;
   com1 = comm(ios);

@@ -26,11 +26,19 @@ public:
   int64_t buf_sz() const { return n - t - k - 1; }
 };
 
+#ifndef ENABLE_SMALLN
 const static OprfPrimalLPNParameterFp oprf_fp_default = OprfPrimalLPNParameterFp(
-    10168320, 4965, 158000, 11, 166400, 2600, 5060, 6, 9600, 600, 1220, 4); 
+  10168320, 4965, 158000, 11, 166400, 2600, 5060, 6, 9600, 600, 1220, 4); 
+#else
+const static OprfPrimalLPNParameterFp oprf_fp_default = OprfPrimalLPNParameterFp(
+  166400, 2600, 5060, 6, 166400, 2600, 5060, 6, 9600, 600, 1220, 4); 
+#endif
+
 // 9600 / 600 = 16 = 2^4
 // 166400 / 2600 = 2^6
 // 10168320 / 4965 = 2^11
+// 317760 / 4965 = 2^6
+// 10168320, 4965, 158000, 11,
 
 template <typename IO> class OprfVoleTriple {
 public:
@@ -306,10 +314,16 @@ public:
     //ThreadPool pool_tmp(1);
     //auto fut = pool_tmp.enqueue([this]() { libot_extend_initialization(); });
 
+#ifndef ENABLE_SMALLN    
     // space for pre-processing triples
     std::vector<mpz_class> pre_yz0(param.n_pre0);
     std::vector<mpz_class> pre_x0;
     if (party == BOB) pre_x0.resize(param.n_pre0);
+#else
+    // this is for smaller test case
+    pre_yz.resize(param.n_pre);
+    pre_x.resize(param.n_pre);
+#endif
 
     // pre-processing tools
     OprfLpnFp<10> lpn_pre0(param.n_pre0, param.k_pre0, pool, pool->size());
@@ -330,26 +344,42 @@ public:
     }
 
     // generate 2*tree_n+k_pre triples and extend
-    OprfBaseVole<IO> *svole0;
+    SoftSpokenOprfBaseVole<IO> *svole0;
     int triple_n0 = 1 + mpfss_pre0.tree_n + param.k_pre0;
     if (party == ALICE) {
       std::vector<mpz_class> key(triple_n0);
-      svole0 = new OprfBaseVole<IO>(party, ios[0], delta, sock);
-      this->Delta = delta;
-      svole0->triple_gen_send(key, triple_n0);
 
+      svole0 = new SoftSpokenOprfBaseVole<IO>(party, ios[0]); //, delta, sock);
+      svole0->receiver_prepare(triple_n0, sock);
+
+      this->Delta = delta = svole0->Delta;
+      svole0->triple_gen_send(key, triple_n0); 
+
+#ifndef ENABLE_SMALLN      
       extend_send(&pre_yz0[0], &mpfss_pre0, &pre_ot_ini0, &lpn_pre0, &key[0]);
+#else
+      extend_send(&pre_yz[0], &mpfss_pre0, &pre_ot_ini0, &lpn_pre0, &key[0]);
+#endif
     } else {
       std::vector<mpz_class> mac(triple_n0);
       std::vector<mpz_class> X(triple_n0);
-      svole0 = new OprfBaseVole<IO>(party, ios[0], sock);
+
+      svole0 = new SoftSpokenOprfBaseVole<IO>(party, ios[0]); //, sock);
+      svole0->sender_prepare(triple_n0, sock);
+
       svole0->triple_gen_recv(mac, X, triple_n0);
 
       // one more argument to save expanding X
+#ifndef ENABLE_SMALLN
       extend_recv(&pre_yz0[0], &pre_x0[0], &mpfss_pre0, &pre_ot_ini0, &lpn_pre0, &mac[0], &X[0]);
+#else
+      extend_recv(&pre_yz[0], &pre_x[0], &mpfss_pre0, &pre_ot_ini0, &lpn_pre0, &mac[0], &X[0]);
+#endif
     }
     delete svole0;
 
+
+#ifndef ENABLE_SMALLN
     // space for pre-processing triples
     pre_yz.resize(param.n_pre);
     pre_x.resize(param.n_pre);
@@ -381,8 +411,10 @@ public:
     pre_ot_inplace = true;
 
     //fut.get();
+#endif
 
     extend_initialization(sock);  
+
   }  
 
   void extend_sender(mpz_class *data_yz, int num) {
