@@ -59,11 +59,13 @@ int main(int argc, char **argv) {
 
     oprf.setup(delta, sock); 
     oprf.setup_malicious(sock);
+    double tts = time_from(start);
     //oprf.malicious_offline(100000);
     //oprf.oprf_eval_server();   
     oprf.oprf_batch_eval_server(test_nn, sock);
 
     double ttt = time_from(start);
+    std::cout << "oprf setup: " << tts << " us" << std::endl;
     std::cout << "oprf eval: " << ttt << " us" << std::endl; 
     uint64_t com2 = comm(ios) - com1;
     std::cout << "communication (B): " << com2 << std::endl;
@@ -82,6 +84,7 @@ int main(int argc, char **argv) {
 
     oprf.setup(tmptmp, sock);
     oprf.setup_malicious(sock); 
+    double tts = time_from(start);
     //oprf.malicious_offline(100000);
     std::vector<mpz_class> in(test_nn);
     for (int i = 0; i < test_nn; i++) in[i] = i;
@@ -89,6 +92,7 @@ int main(int argc, char **argv) {
     oprf.oprf_batch_eval_client(&in[0], test_nn, out, sock);
 
     double ttt = time_from(start);
+    std::cout << "oprf setup: " << tts << " us" << std::endl;
     std::cout << "oprf eval: " << ttt << " us" << std::endl;    
     uint64_t com2 = comm(ios) - com1;
     std::cout << "communication (B): " << com2 << std::endl;
