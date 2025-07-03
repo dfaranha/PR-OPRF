@@ -55,7 +55,7 @@ public:
   bool pre_ot_inplace;
   std::vector<mpz_class> pre_yz, pre_x, vole_triples, vole_x;
 
-  BaseCot<IO> *cot;
+  BaseCot<IO> *cot = nullptr;
   OTPre<IO> *pre_ot = nullptr;
   LibOTPre<IO> *lib_pre_ot = nullptr;
 
